@@ -1,0 +1,12 @@
+numpy
+opencv-python
+djitellopy==2.5.0
+Pillow
+flask
+flask_socketio
+eventlet
+ultralytics
+pygetwindow
+pymavlink
+pywin32
+mss
