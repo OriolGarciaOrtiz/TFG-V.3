@@ -13,7 +13,7 @@ class DroneLauncher:
 
     def setup_main_gui(self):
 
-        print("aaaaaa")
+        print("Siusplauuuu")
 
         self.root.title("Drone Control Launcher")
         self.root.geometry("600x800")
