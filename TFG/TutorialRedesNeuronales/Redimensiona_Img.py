@@ -2,7 +2,7 @@ import os
 from PIL import Image
 
 # 📂 Ruta base de tu dataset
-BASE_DIR = "MiDataSet3/YOLOv5Dataset/images"
+BASE_DIR = "..\\..\\ImageLabeling\\Fotos cotxe"
 
 # Factor de reducción (ejemplo: 3 → reduce a 1/3 del tamaño original)
 FACTOR = 3
