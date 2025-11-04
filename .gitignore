@@ -141,6 +141,9 @@ mnesia/
 rabbitmq/
 rabbitmq-data/
 
+# Image Labeling
+ImageLabeling/
+
 # ActiveMQ
 activemq-data/
 
