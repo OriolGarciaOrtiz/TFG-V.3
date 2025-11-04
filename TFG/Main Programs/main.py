@@ -13,6 +13,8 @@ class DroneLauncher:
 
     def setup_main_gui(self):
 
+        print("aaaaaa")
+
         self.root.title("Drone Control Launcher")
         self.root.geometry("600x800")
         self.root.configure(bg='#f0f0f0')
