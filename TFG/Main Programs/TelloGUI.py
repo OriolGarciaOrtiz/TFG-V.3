@@ -128,7 +128,7 @@ class GUI:
     def create_mode_selectors(self):
 
         simulation_label = tk.Label(self.root, text="Simulation Mode:", font=("Arial", 12))
-        simulation_label.grid(row=1, column=3, padx=(20, 5), pady=10, sticky="w")  # Added sticky="w"
+        simulation_label.grid(row=1, column=3, padx=(20, 5), pady=10, sticky="w")
 
         self.simulation_var = tk.StringVar(value="True")
         simulation_dropdown = tk.OptionMenu(self.root, self.simulation_var, "True", "False")
@@ -155,7 +155,7 @@ class GUI:
         Label(self.root, text="Mode used =", font=("Arial", 12)).grid(row=0, column=8)
 
     def create_pid_controls(self):
-        # Initialize PID variables
+        
         self.Kp_x = tk.DoubleVar(value=0.42)
         self.Ki_x = tk.DoubleVar(value=0.0005)
         self.Kd_x = tk.DoubleVar(value=1.9)
@@ -802,7 +802,7 @@ class GUI:
 
                     largest_box = max(
                         boxes_info,
-                        key=lambda b: (b[2] - b[0]) * (b[3] - b[1])  # área = (x2 - x1) * (y2 - y1)
+                        key=lambda b: (b[2] - b[0]) * (b[3] - b[1])
                     )
                     x1, y1, x2, y2, label_name, conf = largest_box
 

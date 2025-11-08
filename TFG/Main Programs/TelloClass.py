@@ -27,13 +27,13 @@ class DroneController:
         self.me.speed = 0
 
         try:
-            self.model = YOLO("../TutorialRedesNeuronales/best_RC_Final.pt") #Cambiado
+            self.model = YOLO(r"Yolo Models\RC_exterior.pt")
             print("YOLO model loaded successfully.")
         except Exception as e:
             print("Could not load YOLO model:", e)
             self.model = None
         try:
-            self.model2 = YOLO("../TutorialRedesNeuronales/red_Prueba.pt")
+            self.model2 = YOLO(r"Yolo Models\red_Prueba.pt")
             print("YOLO Game Mode model loaded successfully.")
         except Exception as e:
             print("Could not load Game Mode model:", e)
