@@ -29,7 +29,7 @@ class DroneController:
         self.me.yaw_velocity = 0
         self.me.speed = 0
 
-        model_path = os.path.join(base_dir, "taller-dron-Tello", "Lib", "best_RC_Final.pt")
+        model_path = os.path.join(base_dir, "taller-dron-Tello", "Lib", "RC_exterior.pt")
         try:
             self.model = YOLO(model_path)
             print("YOLO model loaded successfully.")
