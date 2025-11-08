@@ -10,3 +10,4 @@ pygetwindow
 pymavlink
 pywin32
 mss
+queue

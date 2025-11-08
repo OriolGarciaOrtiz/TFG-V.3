@@ -41,7 +41,7 @@ class GUI:
 
         # === Cargar parámetros de cámara una vez ===
         try:
-            file_path = r"C:\Tello\taller-dron-Tello\Lib\Parameters\parametros_camara_tello.npz"
+            file_path = r"taller-dron-Tello\Lib\Parameters\parametros_camara_tello.npz"
             data = np.load(file_path)
             self.camera_matrix = data['camera_matrix']
             self.dist_coeffs = data['dist_coeffs']

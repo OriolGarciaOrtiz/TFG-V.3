@@ -15,7 +15,7 @@ class DroneController:
         self.integral_z = 0
 
         self.IMG_SAVE_PATH = r"taller-dron-Tello\Lib\Img_Calibracion"
-        self.PARAM_SAVE_PATH = r"C:\Tello\taller-dron-Tello\Lib\Parameters"
+        self.PARAM_SAVE_PATH = r"taller-dron-Tello\Lib\Parameters"
         os.makedirs(self.IMG_SAVE_PATH, exist_ok=True)
         os.makedirs(self.PARAM_SAVE_PATH, exist_ok=True)
 
