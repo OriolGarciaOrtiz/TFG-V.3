@@ -3,6 +3,7 @@ from SimpleTelloGUI import *
 from HexsoonGUI import GUI as HexsoonGUI
 import tkinter as tk
 from tkinter import Label, Button, Frame, messagebox
+import socket
 
 
 class DroneLauncher:

@@ -197,7 +197,7 @@ class GUI:
         # --- Z Axis ---
         tk.Label(self.root, text="Kp-Z (Proportional)").grid(row=5, column=5, padx=5, pady=5)
         tk.Scale(self.root, from_=0, to=2.0, resolution=0.01, orient="horizontal",
-                 variable=self.Kp_z, length=200).grid(row=6, column=5, padx=5, pady=5)
+                 variable=self.Kp_z, length=200).grid(row=6, column=5, padx=5, pady=5)  
 
         tk.Label(self.root, text="Ki-Z (Integral)").grid(row=5, column=6, padx=5, pady=5)
         tk.Scale(self.root, from_=0, to=0.01, resolution=0.0001, orient="horizontal",
@@ -356,9 +356,9 @@ class GUI:
     def drone_connection(self):
         try:
             self.controller.me.connect()
-            self.controller.is_connected = True
             self.controller.me.streamoff()
             self.controller.me.streamon()
+            self.controller.is_connected = True
             print(f"Connected! Battery: {self.controller.me.get_battery()}%")
             self.connected_label.config(text="Connected", fg="green")
 
