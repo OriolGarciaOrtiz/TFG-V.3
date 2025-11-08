@@ -14,11 +14,8 @@ class DroneController:
         self.integral_y = 0
         self.integral_z = 0
 
-        base_dir = os.path.dirname(__file__)
-
-        self.IMG_SAVE_PATH = os.path.join(base_dir, "taller-dron-Tello", "Lib", "Img_Calibracion")
-        self.PARAM_SAVE_PATH = os.path.join(base_dir, "taller-dron-Tello", "Lib", "Parameters")
-
+        self.IMG_SAVE_PATH = r"taller-dron-Tello\Lib\Img_Calibracion"
+        self.PARAM_SAVE_PATH = r"C:\Tello\taller-dron-Tello\Lib\Parameters"
         os.makedirs(self.IMG_SAVE_PATH, exist_ok=True)
         os.makedirs(self.PARAM_SAVE_PATH, exist_ok=True)
 
@@ -29,13 +26,18 @@ class DroneController:
         self.me.yaw_velocity = 0
         self.me.speed = 0
 
-        model_path = os.path.join(base_dir, "taller-dron-Tello", "Lib", "RC_exterior.pt")
         try:
-            self.model = YOLO(model_path)
+            self.model = YOLO("../TutorialRedesNeuronales/best_RC_Final.pt") #Cambiado
             print("YOLO model loaded successfully.")
         except Exception as e:
             print("Could not load YOLO model:", e)
             self.model = None
+        try:
+            self.model2 = YOLO("../TutorialRedesNeuronales/red_Prueba.pt")
+            print("YOLO Game Mode model loaded successfully.")
+        except Exception as e:
+            print("Could not load Game Mode model:", e)
+            self.model2 = None
 
     def safe_takeoff(self):
         if self.is_connected:
@@ -48,3 +50,9 @@ class DroneController:
     def emergency(self):
         if self.is_connected:
             threading.Thread(target=self.me.emergency).start()
+
+    def go_up(self, distance=70):
+        if self.is_connected:
+            threading.Thread(target=lambda: self.me.move_up(distance)).start()
+        else:
+            print("[DroneController] Drone not connected. Cannot go up.")
