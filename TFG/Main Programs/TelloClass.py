@@ -27,11 +27,20 @@ class DroneController:
         self.me.speed = 0
 
         try:
-            self.model = YOLO(r"Yolo Models\RC_exterior.pt")
+            self.model = YOLO(r"Yolo Models\best_RC_Final.pt")
             print("YOLO model loaded successfully.")
         except Exception as e:
             print("Could not load YOLO model:", e)
             self.model = None
+
+        try:
+            self.model_exterior = YOLO(r"Yolo Models\RC_exterior.pt")
+            print("YOLO exterior model loaded successfully.")
+        except Exception as e:
+            print("Could not load YOLO exterior model:", e)
+            self.model_exterior = None
+
+
         try:
             self.model2 = YOLO(r"Yolo Models\red_Prueba.pt")
             print("YOLO Game Mode model loaded successfully.")

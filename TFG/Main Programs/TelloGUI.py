@@ -130,16 +130,17 @@ class GUI:
         simulation_label = tk.Label(self.root, text="Simulation Mode:", font=("Arial", 12))
         simulation_label.grid(row=1, column=3, padx=(20, 5), pady=10, sticky="w")
 
+        simulation_values = ["True", "False"]
         self.simulation_var = tk.StringVar(value="True")
-        simulation_dropdown = tk.OptionMenu(self.root, self.simulation_var, "True", "False")
-
+        simulation_dropdown = tk.OptionMenu(self.root, self.simulation_var, *simulation_values)
         simulation_dropdown.grid(row=1, column=3, padx=(175, 0), pady=10, sticky="w")
 
         detection_label = tk.Label(self.root, text="Detection Mode:", font=("Arial", 12))
         detection_label.grid(row=2, column=8)
 
+        detection_values = ["Color Contour", "Neural Network", "Game Mode", "Neural Network Exterior"]
         self.detection_var = tk.StringVar(value="Color Contour")
-        detection_dropdown = tk.OptionMenu(self.root, self.detection_var, "Color Contour", "Neural Network","Game Mode")
+        detection_dropdown = tk.OptionMenu(self.root, self.detection_var, *detection_values)
         detection_dropdown.grid(row=2, column=9)
 
         PID_values = ["P", "I", "D", "PD", "PI", "PID", "None"]
@@ -538,11 +539,17 @@ class GUI:
         while True:
             frame = self.yolo_queue.get()  # Espera hasta tener frame
             try:
-                results = self.controller.model.predict(frame, conf=0.2, verbose=False)
+                if self.detection_var.get() == "Neural Network" and self.controller.model:
+                    model = self.controller.model
+                
+                elif self.detection_var.get() == "Neural Network Exterior" and self.controller.model_exterior:
+                    model = self.controller.model_exterior
+
+                results = model.predict(frame, conf=0.2, verbose=False)
                 #results = self.controller.model.track(frame, persist=True, conf=0.4, verbose=False)
 
                 # Solo procesamos para obtener el objeto más grande y su info
-                object_center, w, h, boxes_info = self._process_yolo_result(results)
+                object_center, w, h, boxes_info = self._process_yolo_result(results, model)
 
                 with self.yolo_lock:
                     # Guardamos también info de las boxes para que el hilo principal pueda dibujar
@@ -553,7 +560,7 @@ class GUI:
                 with self.yolo_lock:
                     self.yolo_result = (None, 0, 0, [])
 
-    def _process_yolo_result(self, results):
+    def _process_yolo_result(self, results, model):
         """Procesa las detecciones YOLO y devuelve información para dibujar."""
         object_center = None
         w = h = 0
@@ -566,8 +573,8 @@ class GUI:
                 w_box, h_box = x2 - x1, y2 - y1
                 area = w_box * h_box
                 conf = float(box.conf[0])
-                label = self.controller.model.names[int(box.cls[0])] \
-                    if hasattr(self.controller.model, "names") else str(int(box.cls[0]))
+                label = model.names[int(box.cls[0])] \
+                    if hasattr(model, "names") else str(int(box.cls[0]))
 
                 boxes_info.append((x1, y1, x2, y2, label, conf))
 
@@ -771,7 +778,7 @@ class GUI:
             if detection_mode == "Color Contour":
                 object_center, w, h = self.detect_objects_color_contour(img_dil, img_contour)
 
-            elif detection_mode == "Neural Network" and self.controller.model is not None:
+            elif detection_mode == "Neural Network" and self.controller.model:
                 try:
                     self.yolo_queue.put_nowait(img_contour.copy())
                 except queue.Full:
@@ -786,7 +793,22 @@ class GUI:
                         cv2.putText(img_contour, f"{label} {conf:.2f}",
                                     (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX,
                                     0.7, (255, 255, 255), 2)
+                        
+            elif detection_mode == "Neural Network Exterior" and self.controller.model_exterior:
+                try:
+                    self.yolo_queue.put_nowait(img_contour.copy())
+                except queue.Full:
+                    pass
 
+                with self.yolo_lock:
+                    object_center, w, h, boxes_info = self.yolo_result
+
+                if boxes_info:
+                    for (x1, y1, x2, y2, label, conf) in boxes_info:
+                        cv2.rectangle(img_contour, (x1, y1), (x2, y2), (255, 0, 0), 2)
+                        cv2.putText(img_contour, f"{label} {conf:.2f}",
+                                    (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.7, (255, 255, 255), 2)
 
             elif detection_mode == "Game Mode" and self.controller.model2 is not None:
                 try:
