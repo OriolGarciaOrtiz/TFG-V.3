@@ -1,0 +1,25 @@
+import paho.mqtt.client as mqtt
+import time
+
+BROKER = "broker.hivemq.com"
+PORT = 1883
+TOPIC_SUB = "test/chat/pub"  # Escucha al publicador
+TOPIC_PUB = "test/chat/sub"  # Envía respuesta
+
+def on_message(client, userdata, msg):
+    text = msg.payload.decode()
+    print(f"📥 Mensaje recibido del publicador: {text}")
+
+    # --- Responder ---
+    reply = f"Recibido -> {text}"
+    client.publish(TOPIC_PUB, reply)
+    print(f"📤 Respuesta enviada: {reply}")
+
+client = mqtt.Client()
+client.on_message = on_message
+
+client.connect(BROKER, PORT, 60)
+client.subscribe(TOPIC_SUB)
+
+print("✅ Suscriptor conectado. Esperando mensajes...")
+client.loop_forever()
