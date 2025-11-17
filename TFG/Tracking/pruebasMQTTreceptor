@@ -24,7 +24,7 @@ def on_message(client, userdata, msg):
     convert_data(text)
 
     # --- Print updated variables ---
-    print("Updated values:")  
+    print("Updated values:")
     print("Kp:", Kp)
     print("Ki:", Ki)
     print("Kd:", Kd)
