@@ -19,6 +19,9 @@ class HexsoonController:
         self.integral_x
         self.integral_y
 
+        self.controller.prev_error_x
+        self.controller.prev_error_y
+
 
     def connect_drone(self, mode: str):
 
@@ -54,7 +57,9 @@ class HexsoonController:
         try:
             alt = int(alt)
             if alt <= 0:
-                return
+                raise ValueError("Altitude must be greater than 0")
+            
+            self.dron.takeOff(alt)
             
         except:
             pass
@@ -65,7 +70,7 @@ class HexsoonController:
             self.dron.Land()
 
 
-    def Return_To_Launch(self):
+    def Return_To_Launch_drone(self):
         if self.is_connected:
             self.dron.RTL()
 

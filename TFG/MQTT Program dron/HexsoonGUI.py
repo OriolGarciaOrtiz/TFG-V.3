@@ -12,7 +12,7 @@ class GUI:
         self.panel_width = 320
         self.panel_height = 240
 
-        '''  Todos los parametros que hay que enviar a esta aplicación  '''
+        '''  All the params that have to be sent with MQTT to the drone fromm the GUI  '''
 
         self.h_min
         self.h_max
@@ -36,35 +36,27 @@ class GUI:
 
         self.view_mode
 
+        self.take_off_alt
+
+        # Hace falta usar todos los comandos que tiene el dron (connect, disconnect...)
+
 
     def recieve_data(self): 
         pass
 
+
     def set_data(self):
         pass
 
+
     def prepare_data(self):
         pass
+
 
     def send_data(self):
         pass
 
     
-    def run_in_thread(self, target, *args, status_msg="Executing..."):
-
-        #Helper para ejecutar acciones en segundo plano y que el tk no se quede pillado en las funciones de MavLink
-
-        def task():
-            try:
-                self.log(status_msg)
-                target(*args)
-                self.log("Action Complete")
-            except Exception as e:
-                self.log(f"Error: {e}")
-
-        threading.Thread(target=task, daemon=True).start()
-
-
     def update_frame(self):
         try:
             if not self.controller.is_connected or not self.controller.cap or not self.controller.cap.isOpened():
@@ -113,9 +105,9 @@ class GUI:
 
 
             elif self.detection_mode == "Neural Network" and self.controller.model is not None:
-                #results = self.controller.model.predict(frame_display, conf=0.5, verbose=False)
-                #track tiene el objetivo de mantiene los IDs de objetos entre frames. Usa menos recursos si el objeto no se mueve mucho
-                #así que quizas puede mejorar la velocidad para que la camara no vaya con tanto delay
+
+                # Track tiene el objetivo de mantiene los IDs de objetos entre frames. Usa menos recursos si el objeto no se mueve mucho
+                # así que quizas puede mejorar la velocidad para que la camara no vaya con tanto delay
                 results = self.controller.model.track(frame_display, persist=True, conf=0.5, verbose=False)
                 max_area = 0
 
