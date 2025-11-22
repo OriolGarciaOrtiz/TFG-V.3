@@ -3,7 +3,7 @@ import time
 
 class DroneLauncher:
     def __init__(self):
-        self.drone_gui = HexsoonGUI(self)
+        self.drone_gui = HexsoonGUI()
     
     def main(self):
         try:

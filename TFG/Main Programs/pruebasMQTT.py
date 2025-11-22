@@ -14,7 +14,7 @@ import time
 # CONFIGURACIÓN MQTT
 # ===============================
 
-BROKER_IP = "192.168.1.40"
+BROKER_IP = "broker.hivemq.com"
 PORT = 1883
 
 # Topics donde el DRON envía datos
