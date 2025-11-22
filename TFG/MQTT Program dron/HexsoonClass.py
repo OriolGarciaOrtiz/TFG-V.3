@@ -46,11 +46,7 @@ class HexsoonController:
                 print("Picamera2 initialized successfully.")
                 self.cap = None
             else:
-                # Fallback to OpenCV webcam
-                self.cap = cv2.VideoCapture(0)
-                if self.cap is not None and not self.cap.isOpened():
-                    raise RuntimeError("OpenCV VideoCapture failed to open.")
-                print("OpenCV VideoCapture initialized as fallback.")
+                print("Pi camera not available")
                 self.picam2 = None
         except Exception as e:
             self.picam2 = None
