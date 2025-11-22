@@ -160,8 +160,12 @@ class GUI:
                                        self.takeoff_click, self.take_off_alt, self.land_click,
                                        self.rtl_click, self.arm_click)
             
-            if not self.controller.is_connected or self.controller.picam2 is None:
-                self.log("Camera not initialized or drone not connected.")
+            if not self.controller.is_connected:
+                self.log("Drone not connected.")
+                return
+
+            if self.controller.picam2 is None:
+                self.log("Camera not initialized")
                 return
 
             frame = self.controller.get_frame()
