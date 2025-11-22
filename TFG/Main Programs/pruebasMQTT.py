@@ -41,6 +41,9 @@ class BaseStation:
         self.contour_image = None
         self.last_velocity = "0,0,0"
 
+        self.first_time = True
+        self.start_time = time.monotonic()
+
         # --- MQTT ---
         self.client = mqtt.Client()
         self.client.on_connect = self.on_connect
@@ -128,7 +131,15 @@ class BaseStation:
     # -----------------------------
 
     def send_cmd(self, vx, vy, vz):
-        payload = json.dumps({"vx": vx, "vy": vy, "vz": vz})
+
+        now = time.monotonic()
+
+        if now - self.start_time < 10:
+            send = True
+        else:
+            send = False
+
+        payload = json.dumps({"vx": vx, "vy": vy, "vz": vz, 'connect_click': send})
         self.client.publish(TOPIC_CMD_VEL, payload)
 
     # -----------------------------

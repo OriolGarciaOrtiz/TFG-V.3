@@ -114,6 +114,13 @@ class GUI:
 
         self.try_mode = data.get("try_mode", self.try_mode)
 
+        self.connect_click = bool(data.get("connect_click", self.try_mode))
+        self.disconnect_mode = bool(data.get("disconnect_mode", self.try_mode))
+        self.takeoff_click = bool(data.get("takeoff_click", self.try_mode))
+        self.land_click = bool(data.get("land_click", self.try_mode))
+        self.rtl_click = bool(data.get("rtl_click", self.try_mode))
+        self.arm_click = bool(data.get("arm_click", self.try_mode))
+
 
     def prepare_data(self, original_frame, detection_frame) -> dict:
 
