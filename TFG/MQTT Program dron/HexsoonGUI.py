@@ -1,15 +1,15 @@
 from HexsoonClass import *
-import cv2
 import numpy as np
 import paho.mqtt.client as mqtt
-from picamera import PiCamera
+import json
+import base64
 
 
 class GUI:
-    def __init__(self, root):
-        self.root = root
+    def __init__(self):
         self.is_connected = False
         self.controller = HexsoonController()
+        self.controller.init_camera()
         self.panel_width = 320
         self.panel_height = 240
 
@@ -36,6 +36,9 @@ class GUI:
         self.v_min = 0
         self.v_max = 255
 
+        self.t1 = 0
+        self.t2 = 255
+
         # --- Detection mode ---
         self.detection_mode = "Color Contour"   # or "Neural Network" or None
 
@@ -58,36 +61,103 @@ class GUI:
         # --- Takeoff altitude ---
         self.take_off_alt = 3
 
-        # Hace falta usar todos los comandos que tiene el dron (connect, disconnect...)
+        self.try_mode = "Practice"
+
+        self.connect_click = False
+        self.disconnect_mode = False
+        self.takeoff_click = False
+        self.land_click = False
+        self.rtl_click = False
+        self.arm_click = False
 
 
-    def recieve_data(self, client, userdata, msg): 
-        text = msg.payload.decode()
-        print("📥 MQTT recibido:", text)
+    def receive_data(self, client, userdata, msg): 
+        
+        text: str = msg.payload.decode('utf-8')
+
+        self.set_data(text)
 
 
-    def set_data(self):
-        pass
+    def set_data(self, msg):
+        
+        data: dict = json.loads(msg)
+
+        self.h_min = int(data.get("h_min", self.h_min))
+        self.h_max = int(data.get("h_max", self.h_max))
+        self.s_min = int(data.get("s_min", self.s_min))
+        self.s_max = int(data.get("s_max", self.s_max))
+        self.v_min = int(data.get("v_min", self.v_min))
+        self.v_max = int(data.get("v_max", self.v_max))
+
+        self.t1 = int(data.get("t1", self.t1))
+        self.t2 = int(data.get("t2", self.t2))
+
+        self.detection_mode = data.get("detection_mode", self.detection_mode)
+
+        self.Kp_x = float(data.get("Kp_x", self.Kp_x))
+        self.Ki_x = float(data.get("Ki_x", self.Ki_x))
+        self.Kd_x = float(data.get("Kd_x", self.Kd_x))
+        self.Kp_y = float(data.get("Kp_y", self.Kp_y))
+        self.Ki_y = float(data.get("Ki_y", self.Ki_y))
+        self.Kd_y = float(data.get("Kd_y", self.Kd_y))
+
+        self.PID_mode = data.get("PID_mode", self.PID_mode)
+
+        self.max_velocity = int(data.get("max_velocity", self.max_velocity))
+
+        # FIXED: view_mode should come from data["view_mode"]
+        self.view_mode = data.get("view_mode", self.view_mode)
+
+        self.take_off_alt = int(data.get("take_off_alt", self.take_off_alt))
+
+        self.try_mode = data.get("try_mode", self.try_mode)
 
 
-    def prepare_data(self):
-        pass
+    def prepare_data(self, original_frame, detection_frame) -> dict:
+
+        _, buffer_original = cv2.imencode(".jpg", original_frame)
+
+        _, buffer_detected = cv2.imencode(".jpg", detection_frame)
+
+        img_b64_original = base64.b64encode(buffer_original).decode()
+
+        img_b64_detected = base64.b64encode(buffer_detected).decode()
+        
+        data: dict = {'left_right': self.controller.left_right,
+                      'for_back': self.controller.for_back,
+                      'up_down': self.controller.up_down,
+                      'yaw': self.controller.yaw,
+                      'frame_display': img_b64_original,
+                      'img_contour': img_b64_detected}
+        
+
+        self.send_data(data)
 
 
-    def send_data(self):
-        pass
+    def send_data(self, data: dict):
+        
+        message: str = json.dumps(data)
+
+        self.client.publish(self.TOPIC_PUB, message)
+
+    def log(self, message):
+        print(message)
 
     
     def update_frame(self):
         try:
-            if not self.controller.is_connected or not self.controller.cap or not self.controller.cap.isOpened():
+
+            self.controller.do_actions(self.connect_click, self.try_mode, self.disconnect_mode,
+                                       self.takeoff_click, self.take_off_alt, self.land_click,
+                                       self.rtl_click, self.arm_click)
+            
+            if not self.controller.is_connected or self.controller.picam2 is None:
                 self.log("Camera not initialized or drone not connected.")
                 return
 
-            ret, frame = self.controller.cap.read()
-            if not ret or frame is None:
-                self.log("Could not read frame from the camera.")
-                self.root.after(100, self.update_frame)
+            frame = self.controller.get_frame()
+            if frame is None:
+                self.log("Could not read frame from the PiCamera.")
                 return
 
             frame_display = cv2.resize(frame, (self.panel_width, self.panel_height))
@@ -100,7 +170,7 @@ class GUI:
 
             img_blur = cv2.GaussianBlur(result, (7, 7), 1)
             img_gray = cv2.cvtColor(img_blur, cv2.COLOR_BGR2GRAY)
-            img_canny = cv2.Canny(img_gray, self.t1.get(), self.t2.get())
+            img_canny = cv2.Canny(img_gray, self.t1, self.t2)
             kernel = np.ones((5, 5), np.uint8)
             img_dil = cv2.dilate(img_canny, kernel, iterations=1)
 
@@ -109,11 +179,6 @@ class GUI:
             img_contour = frame_display.copy()
 
             if self.detection_mode == "Color Contour":
-                img_blur = cv2.GaussianBlur(result, (7, 7), 1)
-                img_gray = cv2.cvtColor(img_blur, cv2.COLOR_BGR2GRAY)
-                img_canny = cv2.Canny(img_gray, self.t1.get(), self.t2.get())
-                kernel = np.ones((5, 5), np.uint8)
-                img_dil = cv2.dilate(img_canny, kernel, iterations=1)
 
                 contours, _ = cv2.findContours(img_dil, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
                 if contours:
@@ -203,20 +268,22 @@ class GUI:
                 self.controller.prev_error_y = error_y
 
                 if self.view_mode == "Front View":
-                    left_right = vx
-                    up_down = vy
-                    for_back = 0
+                    self.controller.left_right = vx
+                    self.controller.up_down = vy
+                    self.controller.for_back = 0
                 else:
-                    left_right = vx
-                    for_back = vy
-                    up_down = 0
+                    self.controller.left_right = vx
+                    self.controller.for_back = vy
+                    self.controller.up_down = 0
 
-                self.controller.set_velocity(left_right, for_back, up_down, yaw=0)
+                self.controller.set_velocity()
+
+            self.prepare_data(frame_display, img_contour)
+
+            return
 
 
         except Exception as e:
             self.log(f"Error in update_frame def: {e}")
-            self.root.after(1, self.update_frame)
-
-
+            return
 

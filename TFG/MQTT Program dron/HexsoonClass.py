@@ -2,13 +2,17 @@ from dronLink.Dron import Dron
 from ultralytics import YOLO
 from pymavlink import mavutil
 from dronLink.modules.dron_move import _prepare_command_mov
-
+try:
+    from picamera2 import Picamera2
+except Exception:
+    Picamera2 = None
+import cv2
 
 class HexsoonController:
     def __init__(self):
         self.is_connected = False
         self.dron = Dron()
-        self.cap = None  # Local camera (PC webcam)
+        self.cap = None
         try:
             self.model = YOLO("best_RC_Final.pt")
             print("YOLO model loaded successfully.")
@@ -16,11 +20,74 @@ class HexsoonController:
             print("Could not load YOLO model:", e)
             self.model = None
 
-        self.integral_x
-        self.integral_y
+        self.integral_x = 0
+        self.integral_y = 0
 
-        self.controller.prev_error_x
-        self.controller.prev_error_y
+        self.prev_error_x = 0
+        self.prev_error_y = 0
+
+        self.left_right = 0
+        self.for_back = 0
+        self.up_down = 0
+        self.yaw = 0
+
+
+    def init_camera(self, resolution=(320, 240)):
+        """
+        Initialize Picamera2 if available, otherwise fallback to cv2.VideoCapture(0).
+        Sets either self.picam2 or self.cap accordingly.
+        """
+        try:
+            if Picamera2 is not None:
+                self.picam2 = Picamera2()
+                config = self.picam2.create_preview_configuration(main={"size": resolution})
+                self.picam2.configure(config)
+                self.picam2.start()
+                print("Picamera2 initialized successfully.")
+                self.cap = None
+            else:
+                # Fallback to OpenCV webcam
+                self.cap = cv2.VideoCapture(0)
+                if self.cap is not None and not self.cap.isOpened():
+                    raise RuntimeError("OpenCV VideoCapture failed to open.")
+                print("OpenCV VideoCapture initialized as fallback.")
+                self.picam2 = None
+        except Exception as e:
+            self.picam2 = None
+            if self.cap is not None and hasattr(self.cap, "release"):
+                try:
+                    self.cap.release()
+                except Exception:
+                    pass
+            self.cap = None
+            print("Error initializing camera:", e)
+
+
+    def get_frame(self):
+        """
+        Return a BGR numpy array frame or None if not available.
+        """
+        try:
+            if self.picam2 is not None:
+                # Picamera2's capture_array returns RGB by default for many configs;
+                # convert to BGR for OpenCV processing if needed.
+                frame = self.picam2.capture_array()
+                if frame is None:
+                    return None
+                # If frame is RGB, convert to BGR
+                if frame.shape[2] == 3:
+                    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                return frame
+            elif self.cap is not None:
+                ret, frame = self.cap.read()
+                if not ret:
+                    return None
+                return frame
+            else:
+                return None
+        except Exception as e:
+            print("Exception in get_frame():", e)
+            return None
 
 
     def connect_drone(self, mode: str):
@@ -80,7 +147,28 @@ class HexsoonController:
             self.dron.arm()
 
 
-    def set_velocity(self, left_right, for_back, up_down, yaw=0):
+    def do_actions(self, connect_click: bool, try_mode: str, disconnect_mode: bool, takeoff_click: bool, take_off_alt, land_click: bool, rtl_click: bool, arm_click: bool):
+
+        if connect_click:
+            self.connect_drone(try_mode)
+
+        if disconnect_mode:
+            self.disconnect_drone()
+
+        if takeoff_click:
+            self.take_off_drone(take_off_alt)
+
+        if land_click:
+            self.land_drone()
+
+        if rtl_click:
+            self.Return_To_Launch_drone()
+
+        if arm_click:
+            self.arm()
+
+
+    def set_velocity(self):
 
         try:
 
@@ -89,9 +177,9 @@ class HexsoonController:
             if vehicle is None:
                 return
 
-            step_x = for_back / 100.0
-            step_y = left_right / 100.0
-            step_z = -up_down / 100.0
+            step_x = self.for_back / 100.0
+            step_y = self.left_right / 100.0
+            step_z = -self.up_down / 100.0
 
             msg = _prepare_command_mov(self.dron, step_x, step_y, step_z, bodyRef=True)
             print(msg)
