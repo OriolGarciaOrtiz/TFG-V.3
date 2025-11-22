@@ -1,7 +1,8 @@
 from HexsoonClass import *
 import cv2
 import numpy as np
-import threading
+import paho.mqtt.client as mqtt
+from picamera import PiCamera
 
 
 class GUI:
@@ -12,37 +13,57 @@ class GUI:
         self.panel_width = 320
         self.panel_height = 240
 
+        self.BROKER = "broker.hivemq.com"
+        self.PORT = 1883
+        self.TOPIC_SUB = "test/chat/pub"  # Escucha al publicador
+        self.TOPIC_PUB = "test/chat/sub"  # Envía respuesta
+
+        self.client = mqtt.Client()
+        self.client.on_message = self.recieve_data
+
+        self.client.connect(self.BROKER, self.PORT, 60)
+        self.client.subscribe(self.TOPIC_SUB)
+
+        self.client.loop_start()
+
         '''  All the params that have to be sent with MQTT to the drone fromm the GUI  '''
 
-        self.h_min
-        self.h_max
-        self.s_min
-        self.s_max
-        self.v_min
-        self.v_max
+        # --- HSV thresholds ---
+        self.h_min = 0
+        self.h_max = 179
+        self.s_min = 0
+        self.s_max = 255
+        self.v_min = 0
+        self.v_max = 255
 
-        self.detection_mode
+        # --- Detection mode ---
+        self.detection_mode = "Color Contour"   # or "Neural Network" or None
 
-        self.Kp_x
-        self.Ki_x
-        self.Kd_x
-        self.Kp_y
-        self.Ki_y
-        self.Kd_y
+        # --- PID ---
+        self.Kp_x = 0
+        self.Ki_x = 0
+        self.Kd_x = 0
+        self.Kp_y = 0
+        self.Ki_y = 0
+        self.Kd_y = 0
 
-        self.PID_mode
+        self.PID_mode = "PID"   # or "P", "I", "D", etc.
 
-        self.max_velocity
+        # --- Drone velocity limits ---
+        self.max_velocity = 50
 
-        self.view_mode
+        # --- View mode ---
+        self.view_mode = "Front View"  # or "Down View" etc.
 
-        self.take_off_alt
+        # --- Takeoff altitude ---
+        self.take_off_alt = 3
 
         # Hace falta usar todos los comandos que tiene el dron (connect, disconnect...)
 
 
-    def recieve_data(self): 
-        pass
+    def recieve_data(self, client, userdata, msg): 
+        text = msg.payload.decode()
+        print("📥 MQTT recibido:", text)
 
 
     def set_data(self):

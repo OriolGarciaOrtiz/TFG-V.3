@@ -14,6 +14,9 @@ import tkinter as tk
 from tkinter import Scale, messagebox, OptionMenu, Label, StringVar
 from PIL import Image, ImageTk
 import threading
+import paho.mqtt.client as mqtt
+import json
+import time
 
 
 class GUI:
@@ -27,12 +30,26 @@ class GUI:
 
         '''  Data that has to be sent from the drone to the GUI  '''
 
-        self.cap_normal
-        self.cap_detected
+        self.cap_normal = None
+        self.cap_detected = None
 
-        self.left_right
-        self.for_back
-        self.up_down
+        self.left_right = 0
+        self.for_back = 0
+        self.up_down = 0
+
+
+        self.BROKER = "broker.hivemq.com" 
+        self.PORT = 1883
+        self.TOPIC_SUB = "test/chat/pub"  # Escucha al publicador
+        self.TOPIC_PUB = "test/chat/sub"  # Envía respuesta
+
+        self.client = mqtt.Client()
+        self.client.on_message = self.receive_data
+        self.client.connect(self.BROKER, self.PORT, 60)
+        self.client.subscribe(self.TOPIC_SUB)
+        self.client.loop_start()
+
+        self.clock_start = time.monotonic()
 
     def setup_gui(self):
         self.root.title("Hexsoon Drone Controller")
@@ -46,20 +63,40 @@ class GUI:
         self.create_velocity_display()
         self.create_status_label()
 
-    def recieve_data(self): 
+    def receive_data(self): 
         pass
 
     def set_data(self):
         pass
 
-    def prepare_data(self):
-        pass
+    def prepare_data(self) -> str:
+        msg_dict: dict = {'left_right': self.left_right,
+                        'for_back': self.for_back,
+                        'up_down': self.up_down}
+
+        msg: str = json.dumps(msg_dict)
+        return msg
 
     def send_data(self):
-        pass
+        
+        '''
+         Se enviaran los mensages cada 3 segundos del de la GUI para no tener que saturar 
+         las comunicaciones
+        '''
 
-    #Helper para ejecutar acciones en segundo plano y que el tk no se quede pillado en las funciones de MavLink
+        msg = self.prepare_data()
+
+        now = time.monotonic()
+
+        if now - self.clock_start >= 3:
+            self.client.publish(msg)
+
+            self.clock_start = now
+
+
     def run_in_thread(self, target, *args, status_msg="Executing..."):
+
+        #Helper para ejecutar acciones en segundo plano y que el tk no se quede pillado en las funciones de MavLink
 
         def task():
             try:
