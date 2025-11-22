@@ -14,7 +14,7 @@ class HexsoonController:
         self.dron = Dron()
         self.cap = None
         try:
-            self.model = YOLO("best_RC_Final.pt")
+            self.model = YOLO("Yolo Models/best_RC_Final.pt")
             print("YOLO model loaded successfully.")
         except Exception as e:
             print("Could not load YOLO model:", e)

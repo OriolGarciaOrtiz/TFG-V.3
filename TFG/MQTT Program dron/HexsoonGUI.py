@@ -19,7 +19,7 @@ class GUI:
         self.TOPIC_PUB = "test/chat/sub"  # Envía respuesta
 
         self.client = mqtt.Client()
-        self.client.on_message = self.recieve_data
+        self.client.on_message = self.receive_data
 
         self.client.connect(self.BROKER, self.PORT, 60)
         self.client.subscribe(self.TOPIC_SUB)
@@ -69,6 +69,8 @@ class GUI:
         self.land_click = False
         self.rtl_click = False
         self.arm_click = False
+
+        # També s'ha d'enviar el model de Yolo que es vol fer servir
 
 
     def receive_data(self, client, userdata, msg): 
