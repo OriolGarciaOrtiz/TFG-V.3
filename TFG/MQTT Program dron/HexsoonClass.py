@@ -2,10 +2,7 @@ from dronLink.Dron import Dron
 from ultralytics import YOLO
 from pymavlink import mavutil
 from dronLink.modules.dron_move import _prepare_command_mov
-try:
-    from picamera2 import Picamera2
-except Exception:
-    Picamera2 = None
+from picamera2 import Picamera2
 import cv2
 
 class HexsoonController:
