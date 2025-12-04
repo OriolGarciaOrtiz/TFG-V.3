@@ -15,15 +15,13 @@ class GUI:
 
         self.BROKER = "broker.hivemq.com"
         self.PORT = 1883
-        self.TOPIC_SUB = "test/chat/pub"  # Escucha al publicador
-        self.TOPIC_PUB = "test/chat/sub"  # Envía respuesta
-
+        self.TOPIC_SUB = "test/chat/tierra2dron"  # Escucha al publicador
+        self.TOPIC_PUB = "test/chat/dron2tierra"  # Envía respuesta
+        
         self.client = mqtt.Client()
-        self.client.on_message = self.receive_data
-
+        self.client.on_message = self.on_message
         self.client.connect(self.BROKER, self.PORT, 60)
         self.client.subscribe(self.TOPIC_SUB)
-
         self.client.loop_start()
 
         '''  All the params that have to be sent with MQTT to the drone fromm the GUI  '''
@@ -73,13 +71,11 @@ class GUI:
         # També s'ha d'enviar el model de Yolo que es vol fer servir
 
 
-    def receive_data(self, client, userdata, msg): 
+    def on_message(self, client, userdata, msg): 
         
-        text: str = msg.payload.decode('utf-8')
+        text: str = msg.payload.decode()
 
-        print("Received message:", text)
-
-        self.set_data(text)
+        self.set_data(text)     
 
 
     def set_data(self, msg):
@@ -116,31 +112,33 @@ class GUI:
 
         self.try_mode = data.get("try_mode", self.try_mode)
 
-        self.connect_click = bool(data.get("connect_click", self.try_mode))
-        self.disconnect_mode = bool(data.get("disconnect_mode", self.try_mode))
-        self.takeoff_click = bool(data.get("takeoff_click", self.try_mode))
-        self.land_click = bool(data.get("land_click", self.try_mode))
-        self.rtl_click = bool(data.get("rtl_click", self.try_mode))
-        self.arm_click = bool(data.get("arm_click", self.try_mode))
-
+        self.connect_click = bool(data.get("connect_click", self.connect_click))
+        self.disconnect_mode = bool(data.get("disconnect_mode", self.disconnect_mode))
+        self.takeoff_click = bool(data.get("takeoff_click", self.takeoff_click))
+        self.land_click = bool(data.get("land_click", self.land_click))
+        self.rtl_click = bool(data.get("rtl_click", self.rtl_click))
+        self.arm_click = bool(data.get("arm_click", self.arm_click))
+         
 
     def prepare_data(self, original_frame, detection_frame) -> dict:
-
+        # Encode original frame
         _, buffer_original = cv2.imencode(".jpg", original_frame)
-
-        _, buffer_detected = cv2.imencode(".jpg", detection_frame)
-
         img_b64_original = base64.b64encode(buffer_original).decode()
 
+        # Encode detected/contour frame
+        _, buffer_detected = cv2.imencode(".jpg", detection_frame)
         img_b64_detected = base64.b64encode(buffer_detected).decode()
-        
-        data: dict = {'left_right': self.controller.left_right,
-                      'for_back': self.controller.for_back,
-                      'up_down': self.controller.up_down,
-                      'yaw': self.controller.yaw,
-                      'frame_display': img_b64_original,
-                      'img_contour': img_b64_detected}
-        
+    
+        # Prepare dictionary
+        data: dict = {
+            'left_right': self.controller.left_right,
+            'for_back': self.controller.for_back,
+            'up_down': self.controller.up_down,
+            'yaw': self.controller.yaw,
+            'frame_display': img_b64_original,
+            'img_contour': img_b64_detected,
+            'is_connected' : self.is_connected
+        }
 
         self.send_data(data)
 
@@ -157,11 +155,13 @@ class GUI:
 
     
     def update_frame(self):
+            
         try:
 
             self.controller.do_actions(self.connect_click, self.try_mode, self.disconnect_mode,
                                        self.takeoff_click, self.take_off_alt, self.land_click,
                                        self.rtl_click, self.arm_click)
+                                       
             
             if not self.controller.is_connected:
                 self.log("Drone not connected.")
@@ -169,14 +169,15 @@ class GUI:
             
             else:
 
-                if self.controller.picam2 is None:
+                if self.controller.cap is None:
                     self.log("Camera not initialized")
                     return
 
                 frame = self.controller.get_frame()
                 if frame is None:
-                    self.log("Could not read frame from the PiCamera.")
+                    print("Could not read frame from the PiCamera.")
                     return
+
 
                 frame_display = cv2.resize(frame, (self.panel_width, self.panel_height))
                 frame_hsv = cv2.cvtColor(frame_display, cv2.COLOR_BGR2HSV)
