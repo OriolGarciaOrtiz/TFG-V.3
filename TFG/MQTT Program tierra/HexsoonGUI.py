@@ -1,8 +1,6 @@
 from HexsoonClass import *
 import pygetwindow as gw
 import mss
-from pymavlink import mavutil
-from dronLink.modules.dron_move import _prepare_command_mov
 import win32gui
 import win32ui
 import win32con
@@ -24,24 +22,15 @@ class GUI:
         self.root = root
         self.is_connected = False
         self.controller = HexsoonController()
-        self.panel_width = 320
-        self.panel_height = 240
+        self.panel_width = self.controller.panel_width
+        self.panel_height = self.controller.panel_height
         self.setup_gui()
 
         '''  Data that has to be sent from the drone to the GUI  '''
-
-        self.cap_normal = None
-        self.cap_detected = None
-
-        self.left_right = 0
-        self.for_back = 0
-        self.up_down = 0
-
-
         self.BROKER = "broker.hivemq.com" 
         self.PORT = 1883
-        self.TOPIC_SUB = "test/chat/pub"  # Escucha al publicador
-        self.TOPIC_PUB = "test/chat/sub"  # Envía respuesta
+        self.TOPIC_SUB = "test/chat/dron2tierra"  # Escucha al publicador
+        self.TOPIC_PUB = "test/chat/tierra2dron"  # Envía respuesta
 
         self.client = mqtt.Client()
         self.client.on_message = self.receive_data
@@ -49,7 +38,9 @@ class GUI:
         self.client.subscribe(self.TOPIC_SUB)
         self.client.loop_start()
 
-        self.clock_start = time.monotonic()
+        # Timer for sending ALL data every 0.5 seconds
+        self.clock_start = time.monotonic()  # Initialize timer
+        self.send_interval = 0.5  # Send every 0.5 seconds
 
     def setup_gui(self):
         self.root.title("Hexsoon Drone Controller")
@@ -63,41 +54,86 @@ class GUI:
         self.create_velocity_display()
         self.create_status_label()
 
-    def receive_data(self): 
-        pass
+    def receive_data(self, client, userdata, msg): 
+        if self.controller.try_mode == "Practice":
+            text = msg.payload.decode('utf-8')
+            self.set_data(text)
 
-    def set_data(self):
-        pass
+    def set_data(self, msg: str):
+        data = json.loads(msg)
+        
+        self.controller.left_right = float(data.get("left_right", self.controller.left_right))
+        self.controller.for_back = float(data.get("for_back", self.controller.for_back))
+        self.controller.up_down = float(data.get("up_down", self.controller.up_down))
+        self.controller.yaw = float(data.get("yaw", self.controller.yaw))
+        self.controller.uncoded_original_frame = data.get("frame_display", self.controller.uncoded_original_frame)
+        self.controller.uncoded_detected_frame = data.get("img_contour", self.controller.uncoded_detected_frame)
+        self.controller.is_connected = data.get("is_connected", self.controller.is_connected)
 
-    def prepare_data(self) -> str:
-        msg_dict: dict = {'left_right': self.left_right,
-                        'for_back': self.for_back,
-                        'up_down': self.up_down}
-
-        msg: str = json.dumps(msg_dict)
-        return msg
+    def prepare_all_data(self) -> str:
+        """Prepare COMPLETE data package with ALL parameters"""
+        msg_dict = {
+            # HSV values
+            'h_min': self.h_min.get(),
+            'h_max': self.h_max.get(),
+            's_min': self.s_min.get(),
+            's_max': self.s_max.get(),
+            'v_min': self.v_min.get(),
+            'v_max': self.v_max.get(),
+            't1': self.t1.get(),
+            't2': self.t2.get(),
+            
+            # Detection and modes
+            'detection_mode': self.detection_var.get(),
+            'view_mode': self.opt_cam.get(),
+            'try_mode': self.simulation_var.get(),
+            'PID_mode': self.opt.get(),
+            
+            # PID values
+            'Kp_x': self.Kp_x.get(),
+            'Ki_x': self.Ki_x.get(),
+            'Kd_x': self.Kd_x.get(),
+            'Kp_y': self.Kp_y.get(),
+            'Ki_y': self.Ki_y.get(),
+            'Kd_y': self.Kd_y.get(),
+            
+            # Other settings
+            'max_velocity': self.max_velocity.get(),
+            'take_off_alt': self.takeoff_height.get(),
+            
+            # Click states from CONTROLLER (not pending_clicks)
+            'connect_click': self.controller.click_connect,
+            'disconnect_click': self.controller.click_disconnect,
+            'takeoff_click': self.controller.click_take_off,
+            'land_click': self.controller.click_land,
+            'rtl_click': self.controller.click_RTL,
+            'arm_click': self.controller.click_arm,
+        }
+            
+        return json.dumps(msg_dict)
 
     def send_data(self):
-        
         '''
-         Se enviaran los mensages cada 3 segundos del de la GUI para no tener que saturar 
-         las comunicaciones
+        Send ALL parameters every 0.5 seconds
         '''
-
-        msg = self.prepare_data()
-
         now = time.monotonic()
 
-        if now - self.clock_start >= 3:
-            self.client.publish(msg)
-
+        if now - self.clock_start >= self.send_interval:
+            msg = self.prepare_all_data()
+            self.client.publish(self.TOPIC_PUB, msg)
+            
+            # Reset controller's click states AFTER sending
+            self.controller.click_connect = False
+            self.controller.click_disconnect = False
+            self.controller.click_take_off = False
+            self.controller.click_land = False
+            self.controller.click_RTL = False
+            self.controller.click_arm = False
+            
             self.clock_start = now
 
-
     def run_in_thread(self, target, *args, status_msg="Executing..."):
-
-        #Helper para ejecutar acciones en segundo plano y que el tk no se quede pillado en las funciones de MavLink
-
+        """Helper para ejecutar acciones en segundo plano"""
         def task():
             try:
                 self.log(status_msg)
@@ -105,15 +141,15 @@ class GUI:
                 self.log("Action Complete")
             except Exception as e:
                 self.log(f"Error: {e}")
-
         threading.Thread(target=task, daemon=True).start()
-
 
     def create_connection_widgets(self):
         self.connected_label = Label(self.root, text="Not Connected", font=("Arial", 14))
         self.connected_label.grid(row=0, column=0, padx=10, pady=10)
 
-        self.connect_button = tk.Button(self.root, text="Connect", command=self.controller.connect_drone)
+        # Use original command that sets controller.click_connect
+        self.connect_button = tk.Button(self.root, text="Connect", 
+                                       command=self.controller.connect_drone)
         self.connect_button.grid(row=0, column=1, padx=10, pady=10)
 
         self.battery_label = Label(self.root, text="Battery: -", font=("Arial", 14))
@@ -121,50 +157,55 @@ class GUI:
 
     def create_status_label(self):
         self.status_var = tk.StringVar(value="Ready")
-        status_label = tk.Label(self.root, textvariable=self.status_var, font=("Consolas", 12), fg="white", bg="black")
+        status_label = tk.Label(self.root, textvariable=self.status_var, 
+                               font=("Consolas", 12), fg="white", bg="black")
         status_label.place(x=10, y=735, width=1000, height=20)
 
     def log(self, msg):
-        self.root.after(0, lambda: self.status_var.set(msg))
+        self.root.after(30, lambda: self.status_var.set(msg))
 
     def create_control_buttons(self):
-        # Arm Button
-        self.arm_button = tk.Button(self.root,text="Arm",command=lambda: self.run_in_thread(self.arm, status_msg="Arming..."))
+        # Arm Button - use controller.arm directly
+        self.arm_button = tk.Button(self.root, text="Arm",
+                                   command=self.controller.arm)
         self.arm_button.place(x=560, y=70)
-
 
         self.takeoff_height = tk.Entry(self.root, width=10)
         self.takeoff_height.insert(0, "8")
         self.takeoff_height.place(x=480, y=75)
 
-        # Take off button
-        self.take_off_button = tk.Button(self.root,text="Take Off",command=lambda: self.run_in_thread(lambda: self.controller.take_off_drone(int(self.takeoff_height.get())),status_msg="Taking off..."))
+        # Take off button - use controller.take_off_drone directly
+        self.take_off_button = tk.Button(self.root, text="Take Off",
+                                        command=lambda: self.controller.take_off_drone(int(self.takeoff_height.get())))
         self.take_off_button.place(x=400, y=70)
 
-        # Landing Button
-        self.landing_button = tk.Button(self.root,text="Landing",command=lambda: self.run_in_thread(self.land, status_msg="Landing..."))
+        # Landing Button - use controller.land_drone directly
+        self.landing_button = tk.Button(self.root, text="Landing",
+                                       command=self.controller.land_drone)
         self.landing_button.place(x=400, y=120)
 
-        # Disconnect button
-        self.disconnect_button = tk.Button(self.root,text="Disconnect",command=lambda: self.run_in_thread(self.controller.disconnect_drone, status_msg="Disconnecting..."))
+        # Disconnect button - use controller.disconnect_drone directly
+        self.disconnect_button = tk.Button(self.root, text="Disconnect",
+                                          command=self.controller.disconnect_drone)
         self.disconnect_button.place(x=640, y=70)
 
-        # RTL button
-        self.RTL_button = tk.Button(self.root,text="RTL",command=lambda: self.run_in_thread(self.controller.Return_To_Launch,status_msg="Returning to launch point..."))
+        # RTL button - use controller.Return_To_Launch_drone directly
+        self.RTL_button = tk.Button(self.root, text="RTL",
+                                   command=self.controller.Return_To_Launch_drone)
         self.RTL_button.place(x=480, y=120)
-
-
 
     def create_mode_selectors(self):
         self.simulation_var = tk.StringVar(value="Simulation")
-        simulation_dropdown = tk.OptionMenu(self.root, self.simulation_var, "Simulation", "Practice")
+        simulation_dropdown = tk.OptionMenu(self.root, self.simulation_var, 
+                                           "Simulation", "Practice")
         simulation_dropdown.grid(row=0, column=6, padx=10, pady=10)
 
         detection_label = tk.Label(self.root, text="Detection Mode:", font=("Arial", 14))
         detection_label.grid(row=0, column=7, padx=(20, 5), pady=10)
 
         self.detection_var = tk.StringVar(value="Color Contour")
-        detection_dropdown = tk.OptionMenu(self.root, self.detection_var, "Color Contour", "Neural Network")
+        detection_dropdown = tk.OptionMenu(self.root, self.detection_var, 
+                                          "Color Contour", "Neural Network")
         detection_dropdown.grid(row=0, column=8, padx=10, pady=10)
 
         PID_values = ["P", "I", "D", "PD", "PI", "PID", "None"]
@@ -193,27 +234,34 @@ class GUI:
 
         Label(self.root, text="Max velocity:", font=("Arial", 12)).place(x=400, y=370)
         self.max_velocity = tk.DoubleVar(value=60)
-        velocity_slider = tk.Scale(self.root, from_=0, to=60, resolution=1, orient="horizontal",
-                                   variable=self.max_velocity, length=300)
+        velocity_slider = tk.Scale(self.root, from_=0, to=60, resolution=1, 
+                                  orient="horizontal", variable=self.max_velocity, 
+                                  length=300)
         velocity_slider.place(x=400, y=400)
 
     def create_pid_slider_set(self, axis, y_pos):
         kp_label = tk.Label(self.root, text=f"Kp-{axis} (Proportional)")
         kp_label.place(x=800, y=y_pos)
-        kp_slider = tk.Scale(self.root, from_=0, to=2.0, resolution=0.01, orient="horizontal",
-                             variable=getattr(self, f"Kp_{axis.lower()}"), length=200)
+        
+        kp_var = getattr(self, f"Kp_{axis.lower()}")
+        kp_slider = tk.Scale(self.root, from_=0, to=2.0, resolution=0.01, 
+                            orient="horizontal", variable=kp_var, length=200)
         kp_slider.place(x=800, y=y_pos + 25)
 
         ki_label = tk.Label(self.root, text=f"Ki-{axis} (Integral)")
         ki_label.place(x=1000, y=y_pos)
-        ki_slider = tk.Scale(self.root, from_=0, to=0.01, resolution=0.0001, orient="horizontal",
-                             variable=getattr(self, f"Ki_{axis.lower()}"), length=200)
+        
+        ki_var = getattr(self, f"Ki_{axis.lower()}")
+        ki_slider = tk.Scale(self.root, from_=0, to=0.01, resolution=0.0001, 
+                            orient="horizontal", variable=ki_var, length=200)
         ki_slider.place(x=1000, y=y_pos + 25)
 
         kd_label = tk.Label(self.root, text=f"Kd-{axis} (Derivative)")
         kd_label.place(x=1200, y=y_pos)
-        kd_slider = tk.Scale(self.root, from_=0, to=5, resolution=0.1, orient="horizontal",
-                             variable=getattr(self, f"Kd_{axis.lower()}"), length=200)
+        
+        kd_var = getattr(self, f"Kd_{axis.lower()}")
+        kd_slider = tk.Scale(self.root, from_=0, to=5, resolution=0.1, 
+                            orient="horizontal", variable=kd_var, length=200)
         kd_slider.place(x=1200, y=y_pos + 25)
 
     def create_hsv_sliders(self):
@@ -234,7 +282,8 @@ class GUI:
         ]
 
         for var, text, y_pos, label_y in sliders_config:
-            Scale(self.root, from_=0, to=255, orient="horizontal", variable=var, length=200).place(x=100, y=y_pos)
+            Scale(self.root, from_=0, to=255, orient="horizontal", 
+                  variable=var, length=200).place(x=100, y=y_pos)
             Label(self.root, text=text, font=("Arial", 12)).place(x=10, y=label_y)
 
     def create_velocity_display(self):
@@ -252,7 +301,7 @@ class GUI:
         container.place(relx=0.5, rely=0.9, anchor="s", relwidth=1.0, height=400)
         self.video_labels = []
 
-        #Subrame HSV Mask
+        # Subframe HSV Mask
         hsv_frame = tk.Frame(container)
         hsv_frame.grid(row=0, column=0, padx=50)
         tk.Label(hsv_frame, text="HSV Mask", font=("Arial", 12)).pack(pady=(0, 2))
@@ -260,7 +309,7 @@ class GUI:
         hsv_lbl.pack()
         self.video_labels.append(hsv_lbl)
 
-        #Subframe Contour
+        # Subframe Contour
         contour_frame = tk.Frame(container)
         contour_frame.grid(row=0, column=1, padx=50)
         tk.Label(contour_frame, text="Contour", font=("Arial", 12)).pack(pady=(0, 2))
@@ -268,7 +317,7 @@ class GUI:
         contour_lbl.pack()
         self.video_labels.append(contour_lbl)
 
-        #Subframe MissionPlanner
+        # Subframe MissionPlanner
         mission_frame = tk.Frame(container)
         mission_frame.grid(row=0, column=2, padx=50)
         tk.Label(mission_frame, text="MissionPlanner", font=("Arial", 12)).pack(pady=(0, 5))
@@ -290,7 +339,6 @@ class GUI:
                     title = win32gui.GetWindowText(h)
                     if "Mission Planner 1.3.83 build 1.3.9384.38258 ArduCopter V4.7.0-dev" in title:
                         result.append(h)
-
                 result = []
                 win32gui.EnumWindows(enumHandler, result)
                 if not result:
@@ -313,7 +361,6 @@ class GUI:
 
             result = self.safe_print_window(hwnd, saveDC.GetSafeHdc(), 1)
 
-            bmpinfo = saveBitMap.GetInfo()
             bmpstr = saveBitMap.GetBitmapBits(True)
             img = np.frombuffer(bmpstr, dtype=np.uint8)
             img.shape = (height, width, 4)
@@ -331,52 +378,83 @@ class GUI:
             return img
 
         except Exception as e:
-            self.log(f"Error capturing Mission Planner: {e}")
             return None
 
+    def transfer_data(self):
+        """Transfer GUI settings to controller"""
+        self.controller.h_min = self.h_min.get()
+        self.controller.h_max = self.h_max.get()
+        self.controller.t1 = self.t1.get()
+        self.controller.t2 = self.t2.get()
+        self.controller.detection_mode = self.detection_var.get()
+        self.controller.Kp_x = self.Kp_x.get()
+        self.controller.Ki_x = self.Ki_x.get()
+        self.controller.Kd_x = self.Kd_x.get()
+        self.controller.Kp_y = self.Kp_y.get()
+        self.controller.Ki_y = self.Ki_y.get()
+        self.controller.Kd_y = self.Kd_y.get()
+        self.controller.PID_mode = self.opt.get()
+        self.controller.max_velocity = self.max_velocity.get()
+        self.controller.view_mode = self.opt_cam.get()
+        self.controller.take_off_alt = float(self.takeoff_height.get())
+        self.controller.try_mode = self.simulation_var.get()
 
     def update_frame(self):
+        """Main update loop - sends ALL data every 0.5 seconds"""
         try:
-            if not self.is_connected or not self.controller.cap or not self.controller.cap.isOpened():
-                self.log("Camera not initialized or drone not connected.")
-                return
-
-            ret, frame = self.controller.cap.read()
-            if not ret or frame is None:
-                self.log("Could not read frame from the camera.")
-                self.root.after(100, self.update_frame)
-                return
-                        
-
-            # Mostrar en GUI
-            self.lr_label.config(text=f"Left-Right Velocity = {self.left_right}")
-            self.fb_label.config(text=f"For-Back Velocity = {self.for_back}")
-            self.ud_label.config(text=f"Up-Down Velocity = {self.up_down}")
-            self.yaw_label.config(text="Yaw Velocity = 0")
-
-            mission_frame = self.get_mission_planner_frame()
-            if mission_frame is None:
-                mission_frame = np.zeros((480, 360, 3), dtype=np.uint8)
-                cv2.putText(mission_frame, "Mission Planner not found",
-                            (20, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-
-
-            frames_to_show = [self.cap_normal, self.cap_detected, mission_frame]
-            for lbl, frame in zip(self.video_labels, frames_to_show):
-                if len(frame.shape) == 2:
-                    frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
+            # Transfer data to controller
+            self.transfer_data()
+            
+            # Send ALL data every 0.5 seconds in Practice mode
+            if self.controller.try_mode == "Practice":
+                self.send_data()
+            
+            # Update connection status
+            if self.controller.is_connected:
+                status_text = "Connected" if self.controller.is_connected else "Not Connected"
+                color = "green" if self.controller.is_connected else "red"
+                self.connected_label.config(text=status_text, fg=color)
+            
+                if self.simulation_var.get() == "Practice":
+                    original_frame, detected_frame = self.controller.get_frame("Practice")
+                elif self.simulation_var.get() == "Simulation":
+                    original_frame, detected_frame = self.controller.get_frame("Simulation")
                 else:
-                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                imgtk = ImageTk.PhotoImage(Image.fromarray(frame))
-                lbl.imgtk = imgtk
-                lbl.config(image=imgtk)
+                    original_frame, detected_frame = None, None
+                
+                if original_frame is not None and detected_frame is not None:
 
+                    # Update velocity displays
+                    self.lr_label.config(text=f"Left-Right Velocity = {self.controller.left_right}")
+                    self.fb_label.config(text=f"For-Back Velocity = {self.controller.for_back}")
+                    self.ud_label.config(text=f"Up-Down Velocity = {self.controller.up_down}")
+                    self.yaw_label.config(text="Yaw Velocity = 0")
 
-            self.root.after(1, self.update_frame) #Probar a cambiar el valor
+                    # Get Mission Planner frame
+                    mission_frame = self.get_mission_planner_frame()
+                    if mission_frame is None:
+                        mission_frame = np.zeros((400, 600, 3), dtype=np.uint8)
+                        cv2.putText(mission_frame, "Mission Planner not found",
+                                    (20, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+
+                    # Display frames
+                    frames_to_show = [original_frame, detected_frame, mission_frame]
+                    for lbl, frame in zip(self.video_labels, frames_to_show):
+                        if frame is not None:
+                            # Convert BGR to RGB for PIL if needed
+                            if len(frame.shape) == 3 and frame.shape[2] == 3:
+                                try:
+                                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                                except:
+                                    pass
+                            imgtk = ImageTk.PhotoImage(Image.fromarray(frame))
+                            lbl.imgtk = imgtk
+                            lbl.config(image=imgtk)
 
         except Exception as e:
-            self.log(f"Error in update_frame def: {e}")
-            self.root.after(1, self.update_frame)
-
-
-
+            self.log(f"Error in update_frame: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # Schedule next update
+        self.root.after(30, self.update_frame)

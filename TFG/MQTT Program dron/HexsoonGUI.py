@@ -28,49 +28,7 @@ class GUI:
 
         '''  All the params that have to be sent with MQTT to the drone fromm the GUI  '''
 
-        # --- HSV thresholds ---
-        self.h_min = 0
-        self.h_max = 179
-        self.s_min = 0
-        self.s_max = 255
-        self.v_min = 0
-        self.v_max = 255
-
-        self.t1 = 0
-        self.t2 = 255
-
-        # --- Detection mode ---
-        self.detection_mode = "Color Contour"   # or "Neural Network" or None
-
-        # --- PID ---
-        self.Kp_x = 0
-        self.Ki_x = 0
-        self.Kd_x = 0
-        self.Kp_y = 0
-        self.Ki_y = 0
-        self.Kd_y = 0
-
-        self.PID_mode = "PID"   # or "P", "I", "D", etc.
-
-        # --- Drone velocity limits ---
-        self.max_velocity = 50
-
-        # --- View mode ---
-        self.view_mode = "Front View"  # or "Down View" etc.
-
-        # --- Takeoff altitude ---
-        self.take_off_alt = 3
-
-        self.try_mode = "Practice"
-
-        self.connect_click = False
-        self.disconnect_mode = False
-        self.takeoff_click = False
-        self.land_click = False
-        self.rtl_click = False
-        self.arm_click = False
-
-        # També s'ha d'enviar el model de Yolo que es vol fer servir
+        # També s'ha d'enviar el model de Yolo que es vol fer 
 
 
     def receive_data(self, client, userdata, msg): 
@@ -82,7 +40,7 @@ class GUI:
         self.set_data(text)
 
 
-    def set_data(self, msg):
+    def set_data(self, msg: str):
         
         data: dict = json.loads(msg)
 

@@ -14,8 +14,8 @@ import time
 BROKER_IP = "broker.hivemq.com"
 PORT = 1883
 
-TOPIC_SUB = "test/chat/pub"  # la estación escucha aquí
-TOPIC_PUB = "test/chat/sub"  # la estación envía comandos aquí
+TOPIC_SUB = "test/chat/sub"  # la estación escucha aquí
+TOPIC_PUB = "test/chat/pub"  # la estación envía comandos aquí
 
 # ===============================
 # CLASE ESTACIÓN BASE
@@ -57,9 +57,10 @@ class BaseStation:
         client.subscribe(TOPIC_SUB)
 
     def on_message(self, client, userdata, msg):
+        print("Mensaje recibido en topic:", msg)
         try:
             data = json.loads(msg.payload.decode())
-            self.frame_image = self.base64_to_image(data.get("frame_display"))
+            #self.frame_image = self.base64_to_image(data.get("frame_display"))
             self.contour_image = self.base64_to_image(data.get("img_contour"))
 
             self.left_right = data.get("left_right", 0)
