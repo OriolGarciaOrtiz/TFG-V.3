@@ -30,76 +30,40 @@ class HexsoonController:
 
 
     def init_camera(self, resolution=(320, 240)):
-        """
-        Initialize Picamera2 if available, otherwise fallback to cv2.VideoCapture(0).
-        Sets either self.picam2 or self.cap accordingly.
-        """
         try:
-            if Picamera2 is not None:
-                self.picam2 = Picamera2()
-                config = self.picam2.create_preview_configuration(main={"size": resolution})
-                self.picam2.configure(config)
-                self.picam2.start()
-                print("Picamera2 initialized successfully.")
-                self.cap = None
-            else:
-                print("Pi camera not available")
-                self.picam2 = None
+            self.cap = Picamera2()
+            config = self.cap.create_video_configuration(
+                main={"size": resolution, "format": "RGB888"}
+            )
+            self.cap.configure(config)
+            self.cap.start()
+            print("Picamera2 initialized.")
         except Exception as e:
-            self.picam2 = None
-            if self.cap is not None and hasattr(self.cap, "release"):
-                try:
-                    self.cap.release()
-                except Exception:
-                    pass
+            print("Failed to initialize Picamera2:", e)
             self.cap = None
-            print("Error initializing camera:", e)
-
 
     def get_frame(self):
-        """
-        Return a BGR numpy array frame or None if not available.
-        """
-        try:
-            if self.picam2 is not None:
-                # Picamera2's capture_array returns RGB by default for many configs;
-                # convert to BGR for OpenCV processing if needed.
-                frame = self.picam2.capture_array()
-                if frame is None:
-                    return None
-                # If frame is RGB, convert to BGR
-                if frame.shape[2] == 3:
-                    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                return frame
-            elif self.cap is not None:
-                ret, frame = self.cap.read()
-                if not ret:
-                    return None
-                return frame
-            else:
-                return None
-        except Exception as e:
-            print("Exception in get_frame():", e)
+        if self.cap is None:
             return None
+        try:
+            frame = self.cap.capture_array()
+            return frame
+        except:
+            return None
+
 
 
     def connect_drone(self, mode: str):
 
         try:
-
-            if mode == "Simulation":
-                self.dron.connect('tcp:127.0.0.1:5763', 115200)
-
-            elif mode == "Practice": 
-                self.dron.connect('COM3', 57600)
-
-            else: 
-                raise ValueError("Unknown connection mode selected")
             
             self.is_connected = True
+            
+            print("Drone succesfully connetcted")
 
-            if not self.cap.isOpened():
-                raise Exception("Could not access local camera")
+            if self.cap is None:
+                raise Exception("Camera not initialized")
+
             
         except:
             self.is_connected = False
@@ -143,12 +107,14 @@ class HexsoonController:
     def do_actions(self, connect_click: bool, try_mode: str, disconnect_mode: bool, takeoff_click: bool, take_off_alt, land_click: bool, rtl_click: bool, arm_click: bool):
 
         if connect_click:
+            
             self.connect_drone(try_mode)
 
         if disconnect_mode:
             self.disconnect_drone()
 
         if takeoff_click:
+            
             self.take_off_drone(take_off_alt)
 
         if land_click:
