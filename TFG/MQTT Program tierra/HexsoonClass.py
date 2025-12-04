@@ -67,16 +67,17 @@ class HexsoonController:
         self.uncoded_original_frame = None
         self.uncoded_detected_frame = None
 
-        self.ingegral_x = 0
-        self.ingegral_y = 0
-
         self.prev_error_x = 0
         self.prev_error_y = 0
+
+        self.integral_x = 0
+        self.integral_y = 0
 
         self.left_right = 0
         self.for_back = 0
         self.up_down = 0
         self.yaw = 0
+
 
 
     def connect_drone(self):
@@ -156,6 +157,15 @@ class HexsoonController:
 
         except Exception as e:
             return
+        
+        
+    def base64_to_image(self, b64_string):
+        if b64_string is None:
+            return None
+        img_data = base64.b64decode(b64_string)
+        np_arr = np.frombuffer(img_data, np.uint8)
+        frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        return frame
 
 
     def cap_frame(self, mode: str):
@@ -174,46 +184,29 @@ class HexsoonController:
                     return None, None
 
                 try:
-                    np_arr_original = np.frombuffer(
-                        base64.b64decode(self.uncoded_original_frame),
-                        np.uint8
-                    )
-                    decoded_original = cv2.imdecode(np_arr_original, cv2.IMREAD_COLOR)
+                    decoded_original = self.base64_to_image(self.uncoded_original_frame)
                 except:
                     return None, None
 
-                return decoded_original, None  # IMPORTANT
-
+                return decoded_original, None  # Only original frame is available
 
             # ---------------------------------------------------
             # PRACTICE MODE (Raspberry sends ORIGINAL + DETECTED)
             # ---------------------------------------------------
             elif self.try_mode == "Practice":
-                if (self.uncoded_original_frame is None or
-                    self.uncoded_detected_frame is None):
+                # If both frames are missing, return None
+                if self.uncoded_original_frame is None and self.uncoded_detected_frame is None:
+                    
                     return None, None
 
-                try:
-                    # Original
-                    np_arr_original = np.frombuffer(
-                        base64.b64decode(self.uncoded_original_frame), np.uint8
-                    )
-                    decoded_original = cv2.imdecode(np_arr_original, cv2.IMREAD_COLOR)
-
-                    # Detected
-                    np_arr_detected = np.frombuffer(
-                        base64.b64decode(self.uncoded_detected_frame), np.uint8
-                    )
-                    decoded_detected = cv2.imdecode(np_arr_detected, cv2.IMREAD_COLOR)
-
-                except:
-                    return None, None
+                # Decode frames if they exist
+                decoded_original = self.base64_to_image(self.uncoded_original_frame) if self.uncoded_original_frame else None
+                decoded_detected = self.base64_to_image(self.uncoded_detected_frame) if self.uncoded_detected_frame else None
 
                 return decoded_original, decoded_detected
 
             else:
                 return None, None
-
 
         # ------------------------- PC CAMERA MODE -------------------------
         elif mode == "Video Cam":
@@ -228,6 +221,7 @@ class HexsoonController:
 
         # ------------------------- UNKNOWN MODE -------------------------
         return None, None
+
         
 
     def get_object_center(self, dil_frame, img_contour):
@@ -266,14 +260,16 @@ class HexsoonController:
 
             if best_box is not None:
                 x1, y1, x2, y2 = best_box
-                w, h, = x2 - x1, y2 - y1
+                w, h = x2 - x1, y2 - y1
                 cx, cy = x1 + w // 2, y1 + h // 2
+                object_center = (cx, cy)  # <-- fix here
                 cls = int(box.cls[0])
                 conf = float(box.conf[0])
                 label = f"{self.model.names[cls]} {conf:.2f}"
                 cv2.rectangle(img_contour, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.putText(img_contour, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                cv2.circle(img_contour, (cx, cy), 5, (255, 0, 0), cv2.FILLED)
+                cv2.putText(img_contour, label, (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                cv2.circle(img_contour, object_center, 5, (255, 0, 0), cv2.FILLED)
 
                 return object_center, img_contour
 
@@ -395,15 +391,6 @@ class HexsoonController:
         # PRACTICE: Raspberry already sends both frames
         elif mode == "Practice":
             return self.cap_frame("Raspi")
-
-        # VIDEO CAM: process webcam on PC
-        elif mode == "Video Cam":
-            original_frame, _ = self.cap_frame("Video Cam")
-
-            if original_frame is None:
-                return None, None
-
-            return self.get_detected_frame(original_frame)
 
         # UNKNOWN
         return None, None

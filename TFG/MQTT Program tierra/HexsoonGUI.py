@@ -33,7 +33,8 @@ class GUI:
         self.TOPIC_PUB = "test/chat/tierra2dron"  # Envía respuesta
 
         self.client = mqtt.Client()
-        self.client.on_message = self.receive_data
+        self.client.on_message = self.on_message
+        
         self.client.connect(self.BROKER, self.PORT, 60)
         self.client.subscribe(self.TOPIC_SUB)
         self.client.loop_start()
@@ -54,7 +55,7 @@ class GUI:
         self.create_velocity_display()
         self.create_status_label()
 
-    def receive_data(self, client, userdata, msg): 
+    def on_message(self, client, userdata, msg): 
         if self.controller.try_mode == "Practice":
             text = msg.payload.decode('utf-8')
             self.set_data(text)
@@ -402,6 +403,7 @@ class GUI:
     def update_frame(self):
         """Main update loop - sends ALL data every 0.5 seconds"""
         try:
+
             # Transfer data to controller
             self.transfer_data()
             
@@ -411,6 +413,7 @@ class GUI:
             
             # Update connection status
             if self.controller.is_connected:
+
                 status_text = "Connected" if self.controller.is_connected else "Not Connected"
                 color = "green" if self.controller.is_connected else "red"
                 self.connected_label.config(text=status_text, fg=color)
@@ -450,6 +453,9 @@ class GUI:
                             imgtk = ImageTk.PhotoImage(Image.fromarray(frame))
                             lbl.imgtk = imgtk
                             lbl.config(image=imgtk)
+
+            else:
+                self.connected_label.config(text="Not Connected", fg="red")
 
         except Exception as e:
             self.log(f"Error in update_frame: {e}")
