@@ -63,9 +63,9 @@ class HexsoonController:
 
             if self.cap is None:
                 raise Exception("Camera not initialized")
-
-            
+                
         except:
+            
             self.is_connected = False
 
 
