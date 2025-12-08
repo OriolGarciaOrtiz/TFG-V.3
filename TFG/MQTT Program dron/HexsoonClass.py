@@ -8,7 +8,8 @@ import cv2
 class HexsoonController:
     def __init__(self):
         self.is_connected = False
-        self.dron = Dron()
+        self.is_deteceted = False
+        self.is_armed = False
         self.cap = None
         try:
             self.model = YOLO("Yolo Models/best_RC_Final.pt")
@@ -53,7 +54,7 @@ class HexsoonController:
 
 
 
-    def connect_drone(self, mode: str):
+    def connect_drone(self):
 
         try:
             
@@ -70,107 +71,15 @@ class HexsoonController:
 
 
     def disconnect_drone(self): 
-        if self.is_connected:
-            self.dron.disconnect()   
+        if self.is_connected: 
+            self.is_connected =  False 
 
 
-    def take_off_drone(self, alt = 3):
-        if not self.is_connected:
-            return
-        
-        try:
-            alt = int(alt)
-            if alt <= 0:
-                raise ValueError("Altitude must be greater than 0")
-            
-            self.dron.takeOff(alt)
-            
-        except:
-            pass
-
-
-    def land_drone(self):
-        if self.is_connected:
-            self.dron.Land()
-
-
-    def Return_To_Launch_drone(self):
-        if self.is_connected:
-            self.dron.RTL()
-
-
-    def arm(self):
-        if self.is_connected:
-            self.dron.arm()
-
-
-    def do_actions(self, connect_click: bool, try_mode: str, disconnect_mode: bool, takeoff_click: bool, take_off_alt, land_click: bool, rtl_click: bool, arm_click: bool):
+    def do_actions(self, connect_click: bool, disconnect_click: bool):
 
         if connect_click:
             
-            self.connect_drone(try_mode)
+            self.connect_drone()
 
-        if disconnect_mode:
+        if disconnect_click:
             self.disconnect_drone()
-
-        if takeoff_click:
-            
-            self.take_off_drone(take_off_alt)
-
-        if land_click:
-            self.land_drone()
-
-        if rtl_click:
-            self.Return_To_Launch_drone()
-
-        if arm_click:
-            self.arm()
-
-
-    def set_velocity(self):
-
-        try:
-
-            vehicle: mavutil.mavfile = getattr(self.dron, "vehicle", None)
-
-            if vehicle is None:
-                return
-
-            step_x = self.for_back / 100.0
-            step_y = self.left_right / 100.0
-            step_z = -self.up_down / 100.0
-
-            msg = _prepare_command_mov(self.dron, step_x, step_y, step_z, bodyRef=True)
-            print(msg)
-            vehicle.mav.send(msg)
-
-        except:
-            return
-        
-
-    def set_param(self, name, value):
-
-        # El motivo de esta función es la siguiente. El problema era que al usar _prepare_command_mov a partir de 0.4 m/s de velocidad en
-        # left right el dron empezaba a girar en yaw. Intenté hacer _prepare_command_mov_changed con el objetivo de cambiar la máscara para solo velcoidades
-        # y que el movimiento no fuera por posición sino por velocidad pero segía moviendose en yaw el dron. Después pen´se que podría ser
-        # a causa de que estaba cogiendo la referencia del dron pero cambiadba a la NED pero tampoco era eso. Así que como ñultima opción me quedó
-        # que fuera un problema del guided mode. Esto por lo que se ve sucede por un bug / comportamiento por diseño del controlador de GUIDED de ArduCopter.
-        # En el firmware ArduCopter cuando se envia un mensaje SET_POSITION_TARGET_LOCAL_NED con velocidades laterales (vy) en BODY_NED,el controlador interno asume que estás pidiendo
-        # “moverte lateralmente respecto al rumbo actual”.Pero si el yaw no está bloqueado o el modo GUIDED no está limitado, el autopiloto interpreta el movimiento lateral como una
-        # instrucción de girar el yaw para “alinearse” con el vector de velocidad, es decir, ArduCopter intenta mirar hacia donde te mueves.
-        # Por ello he hecho esta función que mantiene el headind fijo y bloquea el yaw en modo guided cambiando las opciones de modo 0 a modo 8   
-
-        vehicle: mavutil.mavfile = getattr(self.dron, "vehicle", None)
-        msg = mavutil.mavlink.MAVLink_param_set_message(
-            vehicle.target_system,
-            vehicle.target_component,
-            name.encode("utf-8"),
-            float(value),
-            mavutil.mavlink.MAV_PARAM_TYPE_REAL32
-        )
-        vehicle.mav.send(msg)
-
-
-    def stabilizeYaw(self):
-        self.set_param("WP_YAW_BEHAVIOR", 0)  # Mantener heading fijo
-        self.set_param("GUID_OPTIONS", 8)  # Bloquear yaw en GUIDED

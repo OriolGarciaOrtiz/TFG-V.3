@@ -7,7 +7,6 @@ import base64
 
 class GUI:
     def __init__(self):
-        self.is_connected = False
         self.controller = HexsoonController()
         self.controller.init_camera()
         self.panel_width = 320
@@ -61,10 +60,6 @@ class GUI:
         # Button states
         self.connect_click = False 
         self.disconnect_mode = False 
-        self.takeoff_click = False 
-        self.land_click = False 
-        self.rtl_click = False 
-        self.arm_click = False
 
 
     # MQTT -----------------------
@@ -131,11 +126,7 @@ class GUI:
 
         # Button states
         self.connect_click = self._to_bool(data.get("connect_click", False))
-        self.disconnect_mode = self._to_bool(data.get("disconnect_mode", False))
-        self.takeoff_click = self._to_bool(data.get("takeoff_click", False))
-        self.land_click = self._to_bool(data.get("land_click", False))
-        self.rtl_click = self._to_bool(data.get("rtl_click", False))
-        self.arm_click = self._to_bool(data.get("arm_click", False))
+        self.disconnect_click = self._to_bool(data.get("disconnect_mode", False))
 
 
     # Prepare and send data -----------------------------
@@ -151,7 +142,8 @@ class GUI:
             "yaw": self.controller.yaw,
             "frame_display": base64.b64encode(buffer_original).decode(),
             "img_contour": base64.b64encode(buffer_detected).decode(),
-            "is_connected": self.is_connected
+            "is_connected": self.controller.is_connected,
+            "object_detected": self.controller.object_detected,
         }
 
         self.send_data(data)
@@ -170,21 +162,17 @@ class GUI:
     # MAIN LOOP ------------------------------------
 
     def update_frame(self):
+        
         try:
+                
             # Execute commands (connect, takeoff, etc.)
             self.controller.do_actions(
-                self.connect_click, self.try_mode, self.disconnect_mode,
-                self.takeoff_click, self.take_off_alt, self.land_click,
-                self.rtl_click, self.arm_click
+                self.connect_click, self.disconnect_click
             )
 
-            # ACTUALITZEM is_connected REALMENT
-            self.is_connected = self.controller.is_connected
-
-            if not self.is_connected:
+            if not self.controller.is_connected:
                 return
 
-            # Camera not initialized
             if self.controller.cap is None:
                 return
 
@@ -259,6 +247,9 @@ class GUI:
             # PID CONTROL -------------------------------------------------------
 
             if object_center is not None:
+                    
+                self.controller.object_detected = True
+                                        
                 cx, cy = object_center
                 error_x = cx - (self.panel_width / 2)
 
@@ -322,8 +313,9 @@ class GUI:
                     self.controller.left_right = vx
                     self.controller.for_back = vy
                     self.controller.up_down = 0
-
-                self.controller.set_velocity()
+                    
+            else:
+                self.controller.object_detected = False
 
             # SEND DATA BACK TO GUI
             self.prepare_data(frame_display, img_contour)
