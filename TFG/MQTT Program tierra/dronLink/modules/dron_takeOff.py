@@ -43,7 +43,7 @@ def takeOff(self, aTargetAltitude, blocking=True, callback=None, params = None):
     print ('vamos a despegar')
     if self.state == 'armed':
         if blocking:
-            self._takeOff(aTargetAltitude)
+            self._takeOff(int(aTargetAltitude))
         else:
             takeOffThread = threading.Thread(target=self._takeOff, args=[aTargetAltitude, callback, params])
             takeOffThread.start()

@@ -102,6 +102,7 @@ class DroneLauncher:
                 if not self.active_windows:
                     self.connected_label.config(text="Status: No Drone Selected", fg='red')
                 secondary_window.destroy()
+                hexsoon_gui.cleanup()
 
             secondary_window.protocol("WM_DELETE_WINDOW", on_closing)
 

@@ -94,7 +94,6 @@ class GUI:
             self.controller.uncoded_original_frame = data.get("frame_display", self.controller.uncoded_original_frame)
             self.controller.uncoded_detected_frame = data.get("img_contour", self.controller.uncoded_detected_frame)
             self.controller.is_connected = data.get("is_connected", self.controller.is_connected)
-            self.controller.object_detected = data.get("object_detected", self.controller.object_detected)
         except Exception as e:
             self.log(f"Error setting data: {e}")
 
@@ -154,23 +153,16 @@ class GUI:
             except Exception as e:
                 self.log(f"Error sending data: {e}")
 
-    def run_in_thread(self, target_func, status_msg="Executing..."):
-        """Helper to run actions in background threads"""
+    def run_in_thread(self, target, *args, status_msg="Executing..."):
+        """Helper para ejecutar acciones en segundo plano"""
         def task():
             try:
                 self.log(status_msg)
-                result = target_func()  # Call the function
-                self.log("Action complete")
-                return result
+                target(*args)
+                self.log("Action Complete")
             except Exception as e:
-                self.log(f"Error: {str(e)}")
-                # Show error message in GUI
-                self.root.after(0, lambda: messagebox.showerror("Error", f"Operation failed:\n{str(e)}"))
-        
-        # Start the thread
-        thread = threading.Thread(target=task, daemon=True)
-        thread.start()
-        return thread
+                self.log(f"Error: {e}")
+        threading.Thread(target=task, daemon=True).start()
 
     def create_connection_widgets(self):
         self.connected_label = Label(self.root, text="Not Connected", font=("Arial", 14))
@@ -178,7 +170,7 @@ class GUI:
 
         # Use original command that sets controller.click_connect
         self.connect_button = tk.Button(self.root, text="Connect", 
-                                       command=lambda: self.run_in_thread(self.controller.connect_drone))
+                                       command=self.controller.connect_drone)
         self.connect_button.grid(row=0, column=1, padx=10, pady=10)
 
         self.battery_label = Label(self.root, text="Battery: -", font=("Arial", 14))
@@ -195,7 +187,7 @@ class GUI:
 
     def create_control_buttons(self):
         # Arm Button - use controller.arm directly
-        self.arm_button = tk.Button(self.root, text="Arm", command=lambda: self.run_in_thread(self.controller.arm_drone))
+        self.arm_button = tk.Button(self.root, text="Arm", command=self.controller.arm_drone)
         self.arm_button.place(x=560, y=70)
 
         self.takeoff_height = tk.Entry(self.root, width=10)
@@ -204,22 +196,22 @@ class GUI:
 
         # Take off button - use controller.take_off_drone directly
         self.take_off_button = tk.Button(self.root, text="Take Off",
-                                        command=lambda: self.run_in_thread(self.controller.take_off_drone))
+                                        command=self.controller.take_off_drone)
         self.take_off_button.place(x=400, y=70)
 
         # Landing Button - use controller.land_drone directly
         self.landing_button = tk.Button(self.root, text="Landing",
-                                       command=lambda: self.run_in_thread(self.controller.land_drone))
+                                       command=self.controller.land_drone)
         self.landing_button.place(x=400, y=120)
 
         # Disconnect button - use controller.disconnect_drone directly
         self.disconnect_button = tk.Button(self.root, text="Disconnect",
-                                          command=lambda: self.run_in_thread(self.controller.disconnect_drone))
+                                          command=self.controller.disconnect_drone)
         self.disconnect_button.place(x=640, y=70)
 
         # RTL button - use controller.Return_To_Launch_drone directly
         self.RTL_button = tk.Button(self.root, text="RTL",
-                                   command=lambda: self.run_in_thread(self.controller.Return_To_Launch_drone))
+                                   command=self.controller.Return_To_Launch_drone)
         self.RTL_button.place(x=480, y=120)
 
     def create_mode_selectors(self):
@@ -499,15 +491,10 @@ class GUI:
                 # Get velocity data from queue
                 if not self.velocity_queue.empty():
                     lr, fb, ud, yaw = self.velocity_queue.get(timeout=0.1)
-                    self.controller.left_right = lr
-                    self.controller.for_back = fb
-                    self.controller.up_down = ud
-                    self.controller.yaw = yaw
                     
                     # Update GUI in main thread
-                    if self.controller.object_detected:
-                        self.controller.set_velocity()
-                    self.root.after(0, self.update_velocity_labels)
+                    self.controller.set_velocity(lr, fb, ud, yaw)
+                    self.root.after(0, self.update_velocity_labels, lr, fb, ud, yaw)
                 
                 time.sleep(0.05)  # 20 Hz update rate
                 
@@ -517,18 +504,12 @@ class GUI:
                 self.log(f"Velocity thread error: {e}")
                 time.sleep(0.1)
 
-    def thread_arm_func(self):
-        pass
-
-    def thread_take_off_func(self):
-        pass
-
-    def update_velocity_labels(self):
+    def update_velocity_labels(self, lr, fb, ud, yaw):
         """Update velocity labels in main thread"""
-        self.lr_label.config(text=f"Left-Right Velocity = {self.controller.left_right:.2f}")
-        self.fb_label.config(text=f"For-Back Velocity = {self.controller.for_back:.2f}")
-        self.ud_label.config(text=f"Up-Down Velocity = {self.controller.up_down:.2f}")
-        self.yaw_label.config(text=f"Yaw Velocity = {self.controller.yaw:.2f}")
+        self.lr_label.config(text=f"Left-Right Velocity = {lr:.2f}")
+        self.fb_label.config(text=f"For-Back Velocity = {fb:.2f}")
+        self.ud_label.config(text=f"Up-Down Velocity = {ud:.2f}")
+        self.yaw_label.config(text=f"Yaw Velocity = {yaw:.2f}")
 
     def thread_get_frame_func(self):
         """Thread for getting camera frames"""
@@ -584,6 +565,31 @@ class GUI:
             except Exception as e:
                 self.log(f"Mission planner thread error: {e}")
                 time.sleep(0.5)
+
+    def set_velocity(self, left_right, for_back, up_down, yaw=0):
+        try:
+            dron = self.controller.dron  # tipo: Dron
+            vehicle: mavutil.mavfile = getattr(dron, "vehicle", None)
+            if vehicle is None:
+                self.log("No active connection with the drone (vehicle = None)")
+                return
+
+            step_x = for_back / 100.0
+            step_y = left_right / 100.0
+            step_z = -up_down / 100.0
+            #Def de dronLink. Se supone que en mavlink  stepx seria la velocidad hacia al norte
+            #(for back si bodyRef = True), set_y seria hacia el este (left-right si bodyRef = True) y set_z sería la up down (bodyRef = True). ¡
+
+            #Problema, a veces para velocidades altas hace giros de yaw
+            msg = _prepare_command_mov(dron, step_x, step_y, step_z, bodyRef=True)
+            self.log(str(msg))
+            print(msg)
+            vehicle.mav.send(msg)
+
+            #self.log(f"Sent speeds: X={step_x:.2f}, Y={step_y:.2f}, Z={step_z:.2f}")
+
+        except Exception as e:
+            self.log(f"Error sending speeds to the drone: {e}")
 
     def update_frame(self):
         """Main update loop - sends ALL data every 0.5 seconds"""

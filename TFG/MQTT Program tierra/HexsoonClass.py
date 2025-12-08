@@ -9,6 +9,7 @@ import base64
 class HexsoonController:
     def __init__(self):
         self.is_connected = False
+        self.object_detected = False
         self.dron = Dron()
         self.cap = None
         try:
@@ -20,13 +21,6 @@ class HexsoonController:
 
         self.panel_width = 320
         self.panel_height = 240
-
-        self.click_connect = False
-        self.click_disconnect = False
-        self.click_take_off = False
-        self.click_land = False
-        self.click_RTL = False
-        self.click_arm = False
 
         self.h_min = 0
         self.h_max = 179
@@ -57,12 +51,8 @@ class HexsoonController:
 
         self.try_mode = "Practice"
 
-        self.connect_click = False
-        self.disconnect_mode = False
-        self.takeoff_click = False
-        self.land_click = False
-        self.rtl_click = False
-        self.arm_click = False
+        self.click_connect = False
+        self.click_disconnect = False
 
         self.uncoded_original_frame = None
         self.uncoded_detected_frame = None
@@ -88,13 +78,14 @@ class HexsoonController:
             self.dron.connect('tcp:127.0.0.1:5763', 115200)
 
             #self.log("Configuring yaw lock (stabilizeYaw)...")
-            #self.stabilizeYaw()
+            self.stabilizeYaw()
             #self.log("Yaw stabilized (no automatic rotation).")
 
         elif self.try_mode == "Practice":
             self.dron.connect('tcp:127.0.0.1:5763', 115200)
             #self.log("Connecting to real drone on COM3...")
             #self.dron.connect('COM3', 57600)
+            self.stabilizeYaw()
             pass
 
         else:
@@ -108,35 +99,37 @@ class HexsoonController:
         
         if self.is_connected:
             
-            self.click_disconnect = True   
+            self.click_disconnect = True
+            self.is_connected = False  
+            self.dron.disconnect()
 
 
     def take_off_drone(self):
         
         if self.is_connected:
             
-            self.click_take_off = True
+            self.dron.takeOff(self.take_off_alt)
 
 
     def land_drone(self):
         
         if self.is_connected:
             
-            self.click_land = True
+            self.dron.Land()
 
 
     def Return_To_Launch_drone(self):
         
         if self.is_connected:
             
-            self.click_RTL = True
+            self.dron.RTL()
 
 
-    def arm(self):
+    def arm_drone(self):
         
         if self.is_connected:
             
-            self.click_arm = True
+            self.dron.arm()
 
 
     def set_velocity(self):
@@ -188,7 +181,7 @@ class HexsoonController:
                 except:
                     return None, None
 
-                return decoded_original, None  # Only original frame is available
+                return decoded_original, decoded_original  # Only original frame is available
 
             # ---------------------------------------------------
             # PRACTICE MODE (Raspberry sends ORIGINAL + DETECTED)
@@ -198,12 +191,19 @@ class HexsoonController:
                 if self.uncoded_original_frame is None and self.uncoded_detected_frame is None:
                     
                     return None, None
+                
+                elif self.uncoded_original_frame is not None and self.uncoded_detected_frame is None:
+                    
+                    decoded_original = self.base64_to_image(self.uncoded_original_frame) if self.uncoded_original_frame else None
+                    return decoded_original, decoded_original
+                
+                else:
 
-                # Decode frames if they exist
-                decoded_original = self.base64_to_image(self.uncoded_original_frame) if self.uncoded_original_frame else None
-                decoded_detected = self.base64_to_image(self.uncoded_detected_frame) if self.uncoded_detected_frame else None
+                    # Decode frames if they exist
+                    decoded_original = self.base64_to_image(self.uncoded_original_frame) if self.uncoded_original_frame else None
+                    decoded_detected = self.base64_to_image(self.uncoded_detected_frame) if self.uncoded_detected_frame else None
 
-                return decoded_original, decoded_detected
+                    return decoded_original, decoded_detected
 
             else:
                 return None, None
@@ -394,3 +394,31 @@ class HexsoonController:
 
         # UNKNOWN
         return None, None
+    
+
+    def set_param(self, name, value):
+
+        # El motivo de esta función es la siguiente. El problema era que al usar _prepare_command_mov a partir de 0.4 m/s de velocidad en
+        # left right el dron empezaba a girar en yaw. Intenté hacer _prepare_command_mov_changed con el objetivo de cambiar la máscara para solo velcoidades
+        # y que el movimiento no fuera por posición sino por velocidad pero segía moviendose en yaw el dron. Después pen´se que podría ser
+        # a causa de que estaba cogiendo la referencia del dron pero cambiadba a la NED pero tampoco era eso. Así que como ñultima opción me quedó
+        # que fuera un problema del guided mode. Esto por lo que se ve sucede por un bug / comportamiento por diseño del controlador de GUIDED de ArduCopter.
+        # En el firmware ArduCopter cuando se envia un mensaje SET_POSITION_TARGET_LOCAL_NED con velocidades laterales (vy) en BODY_NED,el controlador interno asume que estás pidiendo
+        # “moverte lateralmente respecto al rumbo actual”.Pero si el yaw no está bloqueado o el modo GUIDED no está limitado, el autopiloto interpreta el movimiento lateral como una
+        # instrucción de girar el yaw para “alinearse” con el vector de velocidad, es decir, ArduCopter intenta mirar hacia donde te mueves.
+        # Por ello he hecho esta función que mantiene el headind fijo y bloquea el yaw en modo guided cambiando las opciones de modo 0 a modo 8   
+
+        vehicle: mavutil.mavfile = getattr(self.dron, "vehicle", None)
+        msg = mavutil.mavlink.MAVLink_param_set_message(
+            vehicle.target_system,
+            vehicle.target_component,
+            name.encode("utf-8"),
+            float(value),
+            mavutil.mavlink.MAV_PARAM_TYPE_REAL32
+        )
+        vehicle.mav.send(msg)
+
+
+    def stabilizeYaw(self):
+        self.set_param("WP_YAW_BEHAVIOR", 0)  # Mantener heading fijo
+        self.set_param("GUID_OPTIONS", 8)  # Bloquear yaw en GUIDED
