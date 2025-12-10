@@ -9,6 +9,7 @@ import base64
 class HexsoonController:
     def __init__(self):
         self.is_connected = False
+        self.is_armed = False
         self.object_detected = False
         self.dron = Dron()
         self.cap = None
@@ -130,6 +131,8 @@ class HexsoonController:
         if self.is_connected:
             
             self.dron.arm()
+
+            self.is_armed = True
 
 
     def set_velocity(self):

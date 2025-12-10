@@ -24,11 +24,17 @@ class GUI:
         self.is_connected = False
         self.original_frame, self.detected_frame, self.mission_frame = None, None, None
         self.controller = HexsoonController()
+
+        self.misson_panel_heigth = 400
+        self.misson_panel_width = int(self.misson_panel_heigth * 16/9)
         
         # Thread-safe queues
         self.video_queue = queue.Queue(maxsize=2)
         self.velocity_queue = queue.Queue(maxsize=10)
         self.mission_queue = queue.Queue(maxsize=2)
+
+        self.user32 = ctypes.windll.user32
+        self.PrintWindow = self.user32.PrintWindow
         
         # Thread control
         self.running = True
@@ -94,7 +100,6 @@ class GUI:
             self.controller.uncoded_original_frame = data.get("frame_display", self.controller.uncoded_original_frame)
             self.controller.uncoded_detected_frame = data.get("img_contour", self.controller.uncoded_detected_frame)
             self.controller.is_connected = data.get("is_connected", self.controller.is_connected)
-            self.controller.object_detected = data.get("object_detected", self.controller.object_detected)
         except Exception as e:
             self.log(f"Error setting data: {e}")
 
@@ -188,7 +193,7 @@ class GUI:
         self.status_var = tk.StringVar(value="Ready")
         status_label = tk.Label(self.root, textvariable=self.status_var, 
                                font=("Consolas", 12), fg="white", bg="black")
-        status_label.place(x=10, y=735, width=1000, height=20)
+        status_label.place(x=10, y=735, width=700, height=20)
 
     def log(self, msg):
         self.root.after(0, lambda: self.status_var.set(msg))
@@ -243,7 +248,7 @@ class GUI:
         dropdown_x.place(x=1350, y=95)
 
         Mode_cam = ["Front View", "Bottom View"]
-        self.opt_cam = tk.StringVar(value="Front View")
+        self.opt_cam = tk.StringVar(value="Bottom View")
         dropdown_mode = tk.OptionMenu(self.root, self.opt_cam, *Mode_cam)
         dropdown_mode.place(x=1325, y=20)
         Label(self.root, text="Mode used =", font=("Arial", 14)).place(x=1200, y=25)
@@ -331,25 +336,25 @@ class GUI:
 
         # Subframe HSV Mask
         hsv_frame = tk.Frame(container)
-        hsv_frame.grid(row=0, column=0, padx=50)
+        hsv_frame.grid(row=0, column=0, padx=25)
         tk.Label(hsv_frame, text="HSV Mask", font=("Arial", 12)).pack(pady=(0, 2))
-        hsv_lbl = tk.Label(hsv_frame, width=320, height=240, bg="black")
+        hsv_lbl = tk.Label(hsv_frame, width=self.controller.panel_width, height=self.controller.panel_height, bg="black")
         hsv_lbl.pack()
         self.video_labels.append(hsv_lbl)
 
         # Subframe Contour
         contour_frame = tk.Frame(container)
-        contour_frame.grid(row=0, column=1, padx=50)
+        contour_frame.grid(row=0, column=1, padx=25)
         tk.Label(contour_frame, text="Contour", font=("Arial", 12)).pack(pady=(0, 2))
-        contour_lbl = tk.Label(contour_frame, width=320, height=240, bg="black")
+        contour_lbl = tk.Label(contour_frame, width=self.controller.panel_width, height=self.controller.panel_height, bg="black")
         contour_lbl.pack()
         self.video_labels.append(contour_lbl)
 
         # Subframe MissionPlanner
         mission_frame = tk.Frame(container)
-        mission_frame.grid(row=0, column=2, padx=50)
+        mission_frame.grid(row=0, column=2, padx=25)
         tk.Label(mission_frame, text="MissionPlanner", font=("Arial", 12)).pack(pady=(0, 5))
-        mission_lbl = tk.Label(mission_frame, width=600, height=400, bg="black")
+        mission_lbl = tk.Label(mission_frame, width=self.misson_panel_width, height=self.misson_panel_heigth, bg="black")
         mission_lbl.pack(pady=(0, 30))
         self.video_labels.append(mission_lbl)
 
@@ -367,6 +372,7 @@ class GUI:
                     title = win32gui.GetWindowText(h)
                     if "Mission Planner 1.3.83 build 1.3.9384.38258 ArduCopter V4.7.0-dev" in title:
                         result.append(h)
+
                 result = []
                 win32gui.EnumWindows(enumHandler, result)
                 if not result:
@@ -389,6 +395,7 @@ class GUI:
 
             result = self.safe_print_window(hwnd, saveDC.GetSafeHdc(), 1)
 
+            bmpinfo = saveBitMap.GetInfo()
             bmpstr = saveBitMap.GetBitmapBits(True)
             img = np.frombuffer(bmpstr, dtype=np.uint8)
             img.shape = (height, width, 4)
@@ -402,10 +409,11 @@ class GUI:
             if result != 1:
                 return None
 
-            img = cv2.resize(img, (600, 400))
+            img = cv2.resize(img, (self.misson_panel_width, self.misson_panel_heigth))
             return img
 
         except Exception as e:
+            self.log(f"Error capturing Mission Planner: {e}")
             return None
 
     def transfer_data(self):
@@ -453,7 +461,7 @@ class GUI:
                             frames_to_show.append(frame)
                         else:
                             # Create black frame as placeholder
-                            black_frame = np.zeros((240, 320, 3), dtype=np.uint8)
+                            black_frame = np.zeros((self.controller.panel_height, self.controller.panel_width, 3), dtype=np.uint8)
                             frames_to_show.append(black_frame)
                     
                     # Get mission planner frame from stored attribute
@@ -461,9 +469,12 @@ class GUI:
                     
                     if mission_frame is None:
                         # Show placeholder if no mission frame available
-                        mission_frame = np.zeros((400, 600, 3), dtype=np.uint8)
+                        mission_frame = np.zeros((self.misson_panel_width, self.misson_panel_heigth, 3), dtype=np.uint8)
                         cv2.putText(mission_frame, "Mission Planner not found",
                                 (20, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                        
+                    else:
+                        mission_frame = cv2.cvtColor(mission_frame, cv2.COLOR_BGR2RGB)
                     
                     frames_to_show.append(mission_frame)
                     
@@ -505,8 +516,7 @@ class GUI:
                     self.controller.yaw = yaw
                     
                     # Update GUI in main thread
-                    if self.controller.object_detected:
-                        self.controller.set_velocity()
+                    self.controller.set_velocity()
                     self.root.after(0, self.update_velocity_labels)
                 
                 time.sleep(0.05)  # 20 Hz update rate
@@ -545,19 +555,19 @@ class GUI:
                 else:
                     original_frame, detected_frame = None, None
                 
-                if original_frame is not None and detected_frame is not None:
-                    # Put frames in queue for video thread
-                    if not self.video_queue.full():
-                        self.video_queue.put((original_frame, detected_frame), timeout=0.1)
-                    
-                    # Put velocity data in queue
-                    if not self.velocity_queue.full():
-                        self.velocity_queue.put((
-                            self.controller.left_right,
-                            self.controller.for_back,
-                            self.controller.up_down,
-                            self.controller.yaw
-                        ), timeout=0.1)
+                #if original_frame is not None and detected_frame is not None:
+                # Put frames in queue for video thread
+                if not self.video_queue.full():
+                    self.video_queue.put((original_frame, detected_frame), timeout=0.1)
+                
+                # Put velocity data in queue
+                if not self.velocity_queue.full():
+                    self.velocity_queue.put((
+                        self.controller.left_right,
+                        self.controller.for_back,
+                        self.controller.up_down,
+                        self.controller.yaw
+                    ), timeout=0.1)
                 
                 time.sleep(0.033)  # ~30 FPS
                 
