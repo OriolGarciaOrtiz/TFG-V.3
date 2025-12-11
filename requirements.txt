@@ -10,4 +10,5 @@ pygetwindow
 pymavlink
 mss
 paho-mqtt
-import mss
+aiortc
+websockets

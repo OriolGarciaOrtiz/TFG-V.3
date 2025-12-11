@@ -5,6 +5,7 @@ import numpy as np
 from pymavlink import mavutil
 from dronLink.modules.dron_move import _prepare_command_mov
 import base64
+from WebRTCService import WebVideoService
 
 class HexsoonController:
     def __init__(self):
@@ -13,6 +14,9 @@ class HexsoonController:
         self.object_detected = False
         self.dron = Dron()
         self.cap = None
+
+        self.video_service = WebVideoService()
+
         try:
             self.model = YOLO("best_RC_Final.pt")
             print("YOLO model loaded successfully.")
@@ -221,6 +225,13 @@ class HexsoonController:
                 return None, None
 
             return frame, None  # No detected frame for webcam
+        
+        # ------------------------- PC CAMERA MODE -------------------------
+        elif mode == "WebRTC":
+            if self.video_service.img_original is None:
+                return None, None
+
+            return self.video_service.img_original, self.video_service.img_detected
 
         # ------------------------- UNKNOWN MODE -------------------------
         return None, None
@@ -393,7 +404,7 @@ class HexsoonController:
 
         # PRACTICE: Raspberry already sends both frames
         elif mode == "Practice":
-            return self.cap_frame("Raspi")
+            return self.cap_frame("WebRTC")
 
         # UNKNOWN
         return None, None

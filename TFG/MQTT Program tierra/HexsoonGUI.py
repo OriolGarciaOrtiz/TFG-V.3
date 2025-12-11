@@ -1,15 +1,11 @@
 from HexsoonClass import *
-import pygetwindow as gw
-import mss
 import win32gui
 import win32ui
-import win32con
-import win32api
 import ctypes
 import cv2
 import numpy as np
 import tkinter as tk
-from tkinter import Scale, messagebox, OptionMenu, Label, StringVar
+from tkinter import Scale, messagebox, Label
 from PIL import Image, ImageTk
 import threading
 import queue
@@ -596,8 +592,10 @@ class GUI:
                 time.sleep(0.5)
 
     def update_frame(self):
-        """Main update loop - sends ALL data every 0.5 seconds"""
         try:
+
+            self.controller.video_service.is_connected = self.controller.is_connected
+
             # Update connection status
             if self.controller.is_connected:
                 status_text = "Connected"
