@@ -93,8 +93,8 @@ class GUI:
             self.controller.for_back = float(data.get("for_back", self.controller.for_back))
             self.controller.up_down = float(data.get("up_down", self.controller.up_down))
             self.controller.yaw = float(data.get("yaw", self.controller.yaw))
-            self.controller.uncoded_original_frame = data.get("frame_display", self.controller.uncoded_original_frame)
-            self.controller.uncoded_detected_frame = data.get("img_contour", self.controller.uncoded_detected_frame)
+            #self.controller.uncoded_original_frame = data.get("frame_display", self.controller.uncoded_original_frame)
+            #self.controller.uncoded_detected_frame = data.get("img_contour", self.controller.uncoded_detected_frame)
             self.controller.is_connected = data.get("is_connected", self.controller.is_connected)
         except Exception as e:
             self.log(f"Error setting data: {e}")
