@@ -5,18 +5,19 @@ import paho.mqtt.client as mqtt
 import json
 import base64
 import asyncio
+import threading 
 
 class GUI:
-    def __init__(self):
+    def __init__(self, loop):
         self.controller = HexsoonController()
         self.controller.init_camera()
         self.panel_width = 320
         self.panel_height = 240
 
+        self.loop = loop
         self.video_track = CustomVideoStreamTrack()
-        pc = RTCPeerConnection()
-        pc.addTrack(self.video_track)
-
+        self.pc = RTCPeerConnection()
+        self.pc.addTrack(self.video_track)
 
         # MQTT config
         self.BROKER = "broker.hivemq.com"
@@ -142,18 +143,21 @@ class GUI:
     # Prepare and send data -----------------------------
 
     def prepare_data(self, original_frame, detection_frame):
-        _, buffer_original = cv2.imencode(".jpg", original_frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
-        _, buffer_detected = cv2.imencode(".jpg", detection_frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
+        #_, buffer_original = cv2.imencode(".jpg", original_frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
+        #_, buffer_detected = cv2.imencode(".jpg", detection_frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
 
         data = {
             "left_right": self.controller.left_right,
             "for_back": self.controller.for_back,
             "up_down": self.controller.up_down,
             "yaw": self.controller.yaw,
-            "frame_display": base64.b64encode(buffer_original).decode(),
-            "img_contour": base64.b64encode(buffer_detected).decode(),
             "is_connected": self.controller.is_connected,
         }
+        
+        '''
+                    "frame_display": base64.b64encode(buffer_original).decode(),
+            "img_contour": base64.b64encode(buffer_detected).decode(),
+        '''
 
         self.send_data(data)
 
@@ -322,16 +326,16 @@ class GUI:
                     
             else:
                 self.controller.left_right = 0
-                self.controller.up_dwon = 0
+                self.controller.up_down = 0
                 self.controller.for_back = 0
                 self.controller.yaw = 0
 
             self.prepare_data(frame_display, img_contour)
 
-            asyncio.create_task(
-                self.video_track.update_frames(frame_display, img_contour)
+            asyncio.run_coroutine_threadsafe(
+                self.video_track.update_frames(frame_display, img_contour),
+                self.loop
             )
-
 
         except Exception as e:
             self.log(f"Error in update_frame: {e}")
