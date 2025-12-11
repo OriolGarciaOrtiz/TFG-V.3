@@ -127,6 +127,10 @@ class GUI:
         # Button states
         self.connect_click = self._to_bool(data.get("connect_click", False))
         self.disconnect_click = self._to_bool(data.get("disconnect_mode", False))
+        
+        self.controller.do_actions(
+                self.connect_click, self.disconnect_click
+            )
 
 
     # Prepare and send data -----------------------------
@@ -143,7 +147,6 @@ class GUI:
             "frame_display": base64.b64encode(buffer_original).decode(),
             "img_contour": base64.b64encode(buffer_detected).decode(),
             "is_connected": self.controller.is_connected,
-            "object_detected": self.controller.object_detected,
         }
 
         self.send_data(data)
@@ -166,9 +169,6 @@ class GUI:
         try:
                 
             # Execute commands (connect, takeoff, etc.)
-            self.controller.do_actions(
-                self.connect_click, self.disconnect_click
-            )
 
             if not self.controller.is_connected:
                 return
@@ -315,7 +315,10 @@ class GUI:
                     self.controller.up_down = 0
                     
             else:
-                self.controller.object_detected = False
+                self.controller.left_right = 0
+                self.controller.up_dwon = 0
+                self.controller.for_back = 0
+                self.controller.yaw = 0
 
             # SEND DATA BACK TO GUI
             self.prepare_data(frame_display, img_contour)
