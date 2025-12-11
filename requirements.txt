@@ -10,3 +10,5 @@ pygetwindow
 pymavlink
 mss
 paho-mqtt
+aiortc
+websockets
