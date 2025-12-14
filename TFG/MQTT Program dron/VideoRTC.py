@@ -38,8 +38,11 @@ class WebRTCServer:
         print("🖥️ Cliente conectado")
 
         pc = RTCPeerConnection()
-        pc.addTrack(self.video_track_original)
-        pc.addTrack(self.video_track_detected)
+        sender_original = pc.addTrack(self.video_track_original)
+        sender_original._track_label = "original"
+        
+        sender_detected = pc.addTrack(self.video_track_detected)
+        sender_detected._track_label = "detected"
 
         # Crear oferta SDP
         offer = await pc.createOffer()
