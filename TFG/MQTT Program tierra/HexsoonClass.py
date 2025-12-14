@@ -5,17 +5,12 @@ import numpy as np
 from pymavlink import mavutil
 from dronLink.modules.dron_move import _prepare_command_mov
 import base64
-from WebRTCService import WebVideoService
 
 class HexsoonController:
     def __init__(self):
         self.is_connected = False
-        self.is_armed = False
-        self.object_detected = False
         self.dron = Dron()
         self.cap = None
-
-        self.video_service = WebVideoService()
 
         try:
             self.model = YOLO("best_RC_Final.pt")
@@ -72,6 +67,9 @@ class HexsoonController:
         self.for_back = 0
         self.up_down = 0
         self.yaw = 0
+
+        self.original_frame_RTC = None
+        self.detected_frame_RTC = None
 
 
 
@@ -135,8 +133,6 @@ class HexsoonController:
         if self.is_connected:
             
             self.dron.arm()
-
-            self.is_armed = True
 
 
     def set_velocity(self):
@@ -228,10 +224,10 @@ class HexsoonController:
         
         # ------------------------- PC CAMERA MODE -------------------------
         elif mode == "WebRTC":
-            if self.video_service.img_original is None:
+            if self.original_frame_RTC is None:
                 return None, None
 
-            return self.video_service.img_original, self.video_service.img_detected
+            return self.original_frame_RTC, self.detected_frame_RTC
 
         # ------------------------- UNKNOWN MODE -------------------------
         return None, None

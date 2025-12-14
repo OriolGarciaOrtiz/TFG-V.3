@@ -5,7 +5,7 @@ import ctypes
 import cv2
 import numpy as np
 import tkinter as tk
-from tkinter import Scale, messagebox, Label
+from tkinter import Scale, Label
 from PIL import Image, ImageTk
 import threading
 import queue
@@ -166,7 +166,6 @@ class GUI:
             except Exception as e:
                 self.log(f"Error: {str(e)}")
                 # Show error message in GUI
-                self.root.after(0, lambda: messagebox.showerror("Error", f"Operation failed:\n{str(e)}"))
         
         # Start the thread
         thread = threading.Thread(target=task, daemon=True)
@@ -192,7 +191,8 @@ class GUI:
         status_label.place(x=10, y=735, width=700, height=20)
 
     def log(self, msg):
-        self.root.after(0, lambda: self.status_var.set(msg))
+        #self.root.after(0, lambda: self.status_var.set(msg))
+        print(msg)
 
     def create_control_buttons(self):
         # Arm Button - use controller.arm directly
@@ -523,12 +523,6 @@ class GUI:
                 self.log(f"Velocity thread error: {e}")
                 time.sleep(0.1)
 
-    def thread_arm_func(self):
-        pass
-
-    def thread_take_off_func(self):
-        pass
-
     def update_velocity_labels(self):
         """Update velocity labels in main thread"""
         self.lr_label.config(text=f"Left-Right Velocity = {self.controller.left_right:.2f}")
@@ -593,8 +587,6 @@ class GUI:
 
     def update_frame(self):
         try:
-
-            self.controller.video_service.is_connected = self.controller.is_connected
 
             # Update connection status
             if self.controller.is_connected:

@@ -1,23 +1,16 @@
 from HexsoonClass import *
-from VideoRTC import CustomVideoStreamTrack, RTCPeerConnection
+
 import numpy as np
 import paho.mqtt.client as mqtt
 import json
-import base64
-import asyncio
-import threading 
+import json
 
 class GUI:
-    def __init__(self, loop):
+    def __init__(self):
         self.controller = HexsoonController()
         self.controller.init_camera()
         self.panel_width = 320
         self.panel_height = 240
-
-        self.loop = loop
-        self.video_track = CustomVideoStreamTrack()
-        self.pc = RTCPeerConnection()
-        self.pc.addTrack(self.video_track)
 
         # MQTT config
         self.BROKER = "broker.hivemq.com"
@@ -68,6 +61,9 @@ class GUI:
         self.connect_click = False 
         self.disconnect_mode = False 
 
+
+        self.frame_display = None
+        self.img_contour = None
 
     # MQTT -----------------------
 
@@ -178,7 +174,6 @@ class GUI:
         
         try:
                 
-            # Execute commands (connect, takeoff, etc.)
 
             if not self.controller.is_connected:
                 return
@@ -257,8 +252,6 @@ class GUI:
             # PID CONTROL -------------------------------------------------------
 
             if object_center is not None:
-                    
-                self.controller.object_detected = True
                                         
                 cx, cy = object_center
                 error_x = cx - (self.panel_width / 2)
@@ -332,10 +325,8 @@ class GUI:
 
             self.prepare_data(frame_display, img_contour)
 
-            asyncio.run_coroutine_threadsafe(
-                self.video_track.update_frames(frame_display, img_contour),
-                self.loop
-            )
+            self.frame_display = frame_display
+            self.img_contour = img_contour
 
         except Exception as e:
             self.log(f"Error in update_frame: {e}")

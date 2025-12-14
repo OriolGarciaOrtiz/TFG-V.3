@@ -3,7 +3,9 @@ from SimpleTelloGUI import *
 from HexsoonGUI import GUI as HexsoonGUI
 import tkinter as tk
 from tkinter import Label, Button, Frame, messagebox
-import socket
+import threading
+from HexsoonGUI import GUI as HexsoonGUI
+from WebRTCService import DroneVideoReceiver  # Receptor WebRTC en su propio archivo
 
 
 class DroneLauncher:
@@ -81,22 +83,33 @@ class DroneLauncher:
 
     def open_hexsoon_controller(self):
         try:
+            import threading
+
+            # Crear ventana secundaria
             secondary_window = tk.Toplevel(self.root)
-            secondary_window.title("Tello Drone")
-
+            secondary_window.title("Hexagon Drone")
             secondary_window.state('zoomed')
-
             secondary_window.transient(self.root)
             secondary_window.grab_set()
 
+            # Instancia de HexsoonGUI
             hexsoon_gui = HexsoonGUI(secondary_window)
-            hexsoon_gui.update_frame()
+            hexsoon_gui.update_frame()  # loop de actualización de GUI
 
+            # Registrar ventana activa
             self.active_windows.append(secondary_window)
             self.update_window_count()
-            self.connected_label.config(text="Status: Tello Controller Active", fg='green')
+            self.connected_label.config(text="Status: Hexagon Controller Active", fg='green')
 
+            # Inicializar receptor
+            receiver = DroneVideoReceiver(target_gui=hexsoon_gui)
+
+            # Hilo separado para el loop RTC
+            threading.Thread(target=receiver.start, daemon=True).start()
+
+            # Función de cierre
             def on_closing():
+                receiver.running = False  # Detener receptor
                 self.active_windows.remove(secondary_window)
                 self.update_window_count()
                 if not self.active_windows:
@@ -107,7 +120,9 @@ class DroneLauncher:
             secondary_window.protocol("WM_DELETE_WINDOW", on_closing)
 
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to open Tello controller:\n{str(e)}")
+            import tkinter.messagebox as messagebox
+            messagebox.showerror("Error", f"Fallo al abrir controlador Hexagon:\n{str(e)}")
+
 
     def open_tello_controller(self):
         try:

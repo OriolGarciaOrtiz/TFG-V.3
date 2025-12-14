@@ -2,7 +2,7 @@ from dronLink.Dron import Dron
 from ultralytics import YOLO
 from pymavlink import mavutil
 from dronLink.modules.dron_move import _prepare_command_mov
-from picamera2 import Picamera2
+#from picamera2 import Picamera2
 import cv2
 
 class HexsoonController:
@@ -32,12 +32,17 @@ class HexsoonController:
 
     def init_camera(self, resolution=(320, 240)):
         try:
+
+            '''
             self.cap = Picamera2()
             config = self.cap.create_video_configuration(
                 main={"size": resolution, "format": "RGB888"}
             )
             self.cap.configure(config)
             self.cap.start()
+            '''
+            self.cap = 1
+
             print("Picamera2 initialized.")
         except Exception as e:
             print("Failed to initialize Picamera2:", e)
@@ -47,11 +52,13 @@ class HexsoonController:
         if self.cap is None:
             return None
         try:
-            frame = self.cap.capture_array()
+
+            frame = cv2.imread("IMG_20251112_155906_TIMEBURST1.jpg")
+            #frame = self.cap.capture_array()
+
             return frame
         except:
             return None
-
 
 
     def connect_drone(self):
