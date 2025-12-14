@@ -9,8 +9,7 @@ from websockets.exceptions import ConnectionClosed
 class DroneVideoTrack(VideoStreamTrack):
     def __init__(self):
         super().__init__()
-        self.original = np.zeros((240, 320, 3), dtype=np.uint8)
-        self.detected = np.zeros((240, 320, 3), dtype=np.uint8)
+        self.frame = np.zeros((240, 320, 3), dtype=np.uint8)
 
         self.is_connected = False  # Controlado desde la GUI
 
@@ -19,10 +18,7 @@ class DroneVideoTrack(VideoStreamTrack):
         while not self.is_connected:
             await asyncio.sleep(0.1)
 
-        # Crea el frame combinado
-        composite = np.hstack([self.original, self.detected])
-
-        frame = VideoFrame.from_ndarray(composite, format="bgr24")
+        frame = VideoFrame.from_ndarray(self.frame, format="bgr24")
         pts, time_base = await self.next_timestamp()
         frame.pts = pts
         frame.time_base = time_base
@@ -34,18 +30,22 @@ class DroneVideoTrack(VideoStreamTrack):
 
 
 class WebRTCServer:
-    def __init__(self, video_track):
-        self.video_track = video_track
+    def __init__(self, video_track_original, video_track_detected):
+        self.video_track_original = video_track_original
+        self.video_track_detected = video_track_detected
 
     async def handle_client(self, websocket):
         print("🖥️ Cliente conectado")
 
         pc = RTCPeerConnection()
-        pc.addTrack(self.video_track)
+        pc.addTrack(self.video_track_original)
+        pc.addTrack(self.video_track_detected)
 
+        # Crear oferta SDP
         offer = await pc.createOffer()
         await pc.setLocalDescription(offer)
 
+        # Enviar oferta al cliente
         await websocket.send(json.dumps({
             "type": "sdp",
             "sdp": pc.localDescription.sdp,
@@ -68,6 +68,7 @@ class WebRTCServer:
         except Exception as e:
             print(f"❌ Error en handler RTC: {e}")
         finally:
+            await pc.close()
             print("🧹 Cerrando recursos RTC")
 
     async def run(self):

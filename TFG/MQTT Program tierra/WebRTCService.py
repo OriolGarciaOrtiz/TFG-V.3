@@ -8,9 +8,8 @@ from HexsoonGUI import GUI
 
 class DroneVideoReceiver:
     """
-    Ground station receiving dual-camera drone feed,
-    sending frames directly to HexsoonGUI.
-    Improved version with debug, initial delay, and FPS tracking.
+    Estación de tierra que recibe dual-camera feed del dron
+    y actualiza la GUI HexsoonGUI.
     """
     def __init__(self, target_gui: GUI):
         self.frame_count = 0
@@ -20,27 +19,29 @@ class DroneVideoReceiver:
         self.connected = False
         self.pc = None
 
-    async def receive_frame(self, track):
+    async def receive_frame(self, track, track_id):
         """
-        Consume frames from drone and send them to GUI.
+        Recibir frames de un track específico y actualizar la GUI.
         """
-        # Espera inicial para que el dron comience a enviar frames
         await asyncio.sleep(0.5)
         self.start_time = asyncio.get_event_loop().time()
 
         try:
             while self.running:
                 frame = await track.recv()
-                self.frame_count += 1
-
-                # Convertir a ndarray para GUI
                 img = frame.to_ndarray(format="bgr24")
 
-                # Actualizar frames en HexsoonGUI
-                self.gui.controller.original_frame_RTC = img
-                self.gui.controller.detected_frame_RTC = img.copy()  # Placeholder para detección
+                # Actualizar GUI según track
+                if "original" in track_id:
+                    self.gui.controller.original_frame_RTC = img
+                elif "detected" in track_id:
+                    self.gui.controller.detected_frame_RTC = img
+                else:
+                    print(f"[WARNING] Track unknown: {track_id}")
 
-                # Debug: mostrar pts y time_base
+                self.frame_count += 1
+
+                # Debug cada 10 frames
                 if self.frame_count % 10 == 0:
                     print(f"[DEBUG] Frame #{self.frame_count} | pts={frame.pts}, time_base={frame.time_base}")
 
@@ -54,9 +55,9 @@ class DroneVideoReceiver:
             print(f"[ERROR] Error receiving frames: {e}")
             traceback.print_exc()
 
-    async def connect_to_drone(self, websocket_url="ws://127.0.0.1:9999"):
+    async def connect_to_drone(self, websocket_url="ws://192.168.1.102:9999"):
         """
-        Connect to drone via WebSocket + WebRTC and start receiving frames.
+        Conectar al dron mediante WebSocket + WebRTC y recibir ambos tracks.
         """
         if self.connected:
             print("[WARNING] Already connected to drone.")
@@ -69,11 +70,12 @@ class DroneVideoReceiver:
             async with connect(websocket_url) as websocket:
                 print("Connected to drone")
 
+                # Registrar callback para recibir tracks
                 @self.pc.on("track")
                 def on_track(track):
-                    print(f"Track received: {track.kind}")
+                    print(f"Track received: {track.kind}, id={track.id}")
                     if track.kind == "video":
-                        asyncio.create_task(self.receive_frame(track))
+                        asyncio.create_task(self.receive_frame(track, track.id))
                     else:
                         print(f"Ignoring non-video track: {track.kind}")
 
@@ -119,9 +121,9 @@ class DroneVideoReceiver:
             print(f"Total frames received: {self.frame_count}")
             print("Drone connection closed.")
 
-    def start(self, websocket_url="ws://127.0.0.1:9999"):
+    def start(self, websocket_url="ws://192.168.1.102:9999"):
         """
-        Run the asyncio loop in a separate thread safely.
+        Ejecutar la conexión al dron en un loop asyncio.
         """
         try:
             asyncio.run(self.connect_to_drone(websocket_url))
