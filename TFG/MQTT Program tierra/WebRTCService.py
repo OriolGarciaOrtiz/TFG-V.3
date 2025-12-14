@@ -19,7 +19,7 @@ class DroneVideoReceiver:
         self.connected = False
         self.pc = None
 
-    async def receive_frame(self, track, track_id):
+    async def receive_frame(self, track, track_label):
         """
         Recibir frames de un track específico y actualizar la GUI.
         """
@@ -32,12 +32,12 @@ class DroneVideoReceiver:
                 img = frame.to_ndarray(format="bgr24")
 
                 # Actualizar GUI según track
-                if "original" in track_id:
+                if "original" in track_label:
                     self.gui.controller.original_frame_RTC = img
-                elif "detected" in track_id:
+                elif "detected" in track_label:
                     self.gui.controller.detected_frame_RTC = img
                 else:
-                    print(f"[WARNING] Track unknown: {track_id}")
+                    print(f"[WARNING] Track unknown: {track_label}")
 
                 self.frame_count += 1
 
@@ -73,11 +73,16 @@ class DroneVideoReceiver:
                 # Registrar callback para recibir tracks
                 @self.pc.on("track")
                 def on_track(track):
-                    print(f"Track received: {track.kind}, id={track.id}")
-                    if track.kind == "video":
-                        asyncio.create_task(self.receive_frame(track, track.id))
+                    if track.kind != "video":
+                        return
+
+                    # Asignar por orden
+                    if not hasattr(self, "_video_track_1"):
+                        self._video_track_1 = track
+                        asyncio.create_task(self.receive_frame(track, "original"))
                     else:
-                        print(f"Ignoring non-video track: {track.kind}")
+                        self._video_track_2 = track
+                        asyncio.create_task(self.receive_frame(track, "detected"))
 
                 # Esperar oferta SDP del dron
                 message = await websocket.recv()
