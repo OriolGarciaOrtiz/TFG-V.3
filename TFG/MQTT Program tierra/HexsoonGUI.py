@@ -253,12 +253,12 @@ class GUI:
         self.create_pid_slider_set("X", 150)
         self.create_pid_slider_set("Y", 250)
 
-        Label(self.root, text="Max velocity:", font=("Arial", 12)).grid(row=9, column=0)
+        Label(self.root, text="Max velocity:", font=("Arial", 12)).grid(row=7, column=3)
         self.max_velocity = tk.DoubleVar(value=60)
         velocity_slider = tk.Scale(self.root, from_=0, to=60, resolution=1, 
                                   orient="horizontal", variable=self.max_velocity, 
                                   length=200)
-        velocity_slider.grid(row=9, column=1)
+        velocity_slider.grid(row=8, column=3)
 
     def create_pid_slider_set(self, axis, y_pos):
         kp_label = tk.Label(self.root, text=f"Kp-{axis} (Proportional)")
@@ -309,13 +309,13 @@ class GUI:
 
     def create_velocity_display(self):
         self.lr_label = Label(self.root, text="Left-Right Velocity = 0", font=("Arial", 14))
-        self.lr_label.grid(column=3, row=4)
+        self.lr_label.grid(column=3, row=3)
         self.fb_label = Label(self.root, text="For-Back Velocity = 0", font=("Arial", 14))
-        self.fb_label.grid(column=3, row=5)
+        self.fb_label.grid(column=3, row=4)
         self.ud_label = Label(self.root, text="Up-Down Velocity = 0", font=("Arial", 14))
-        self.ud_label.grid(column=3, row=6)
+        self.ud_label.grid(column=3, row=5)
         self.yaw_label = Label(self.root, text="Yaw Velocity = 0", font=("Arial", 14))
-        self.yaw_label.grid(column=3, row=7)
+        self.yaw_label.grid(column=3, row=6)
 
     def create_video_panels(self):
         container = tk.Frame(self.root)
