@@ -150,7 +150,6 @@ class GUI:
                 msg = self.prepare_all_data()
                 self.client.publish(self.TOPIC_PUB, msg)
                 
-                # Reset controller's click states AFTER sending
                 self.controller.click_connect = False
                 self.controller.click_disconnect = False
                 
@@ -163,12 +162,11 @@ class GUI:
         def task():
             try:
                 print(Fore.BLUE + status_msg)
-                result = target_func()  # Call the function
+                result = target_func()
                 print(Fore.GREEN + "Action complete")
                 return result
             except Exception as e:
                 print(Fore.RED + f"Error: {str(e)}")
-                # Show error message in GUI
         
         # Start the thread
         thread = threading.Thread(target=task, daemon=True)
@@ -191,57 +189,57 @@ class GUI:
     def create_control_buttons(self):
         # Arm Button - use controller.arm directly
         self.arm_button = tk.Button(self.root, text="Arm", command=lambda: self.run_in_thread(self.controller.arm_drone))
-        self.arm_button.place(x=560, y=70)
+        self.arm_button.grid(column=4, row=1, padx=10, pady=10)
 
         self.takeoff_height = tk.Entry(self.root, width=10)
         self.takeoff_height.insert(0, "8")
-        self.takeoff_height.place(x=480, y=75)
+        self.takeoff_height.grid(column=2, row=1, padx=10, pady=10)
 
         # Take off button - use controller.take_off_drone directly
         self.take_off_button = tk.Button(self.root, text="Take Off",
                                         command=lambda: self.run_in_thread(self.controller.take_off_drone))
-        self.take_off_button.place(x=400, y=70)
+        self.take_off_button.grid(column=3, row=1, padx=10, pady=10)
 
         # Landing Button - use controller.land_drone directly
         self.landing_button = tk.Button(self.root, text="Landing",
                                        command=lambda: self.run_in_thread(self.controller.land_drone))
-        self.landing_button.place(x=400, y=120)
+        self.landing_button.grid(column=2, row=2, padx=10, pady=10)
 
         # Disconnect button - use controller.disconnect_drone directly
         self.disconnect_button = tk.Button(self.root, text="Disconnect",
                                           command=lambda: self.run_in_thread(self.controller.disconnect_drone))
-        self.disconnect_button.place(x=640, y=70)
+        self.disconnect_button.grid(column=3, row=2, padx=10, pady=10)
 
         # RTL button - use controller.Return_To_Launch_drone directly
         self.RTL_button = tk.Button(self.root, text="RTL",
                                    command=lambda: self.run_in_thread(self.controller.Return_To_Launch_drone))
-        self.RTL_button.place(x=480, y=120)
+        self.RTL_button.grid(column=4, row=2, padx=10, pady=10)
 
     def create_mode_selectors(self):
         self.simulation_var = tk.StringVar(value="Simulation")
         simulation_dropdown = tk.OptionMenu(self.root, self.simulation_var, 
                                            "Simulation", "Practice")
-        simulation_dropdown.grid(row=0, column=6, padx=10, pady=10)
+        simulation_dropdown.grid(row=0, column=3, padx=10, pady=10)
 
         detection_label = tk.Label(self.root, text="Detection Mode:", font=("Arial", 14))
-        detection_label.grid(row=0, column=7, padx=(20, 5), pady=10)
+        detection_label.grid(row=0, column=4, padx=(20, 5), pady=10)
 
         self.detection_var = tk.StringVar(value="Color Contour")
         detection_dropdown = tk.OptionMenu(self.root, self.detection_var, 
                                           "Color Contour", "Neural Network")
-        detection_dropdown.grid(row=0, column=8, padx=10, pady=10)
+        detection_dropdown.grid(row=0, column=5, padx=10, pady=10)
 
         PID_values = ["P", "I", "D", "PD", "PI", "PID", "None"]
-        Label(self.root, text="Controller used =", font=("Arial", 14)).place(x=1200, y=100)
+        Label(self.root, text="Controller used =", font=("Arial", 14)).grid(row=0, column=6, padx=10, pady=10)
         self.opt = tk.StringVar(value="PID")
         dropdown_x = tk.OptionMenu(self.root, self.opt, *PID_values)
-        dropdown_x.place(x=1350, y=95)
+        dropdown_x.grid(row=0, column=7, padx=10, pady=10)
 
         Mode_cam = ["Front View", "Bottom View"]
         self.opt_cam = tk.StringVar(value="Bottom View")
         dropdown_mode = tk.OptionMenu(self.root, self.opt_cam, *Mode_cam)
-        dropdown_mode.place(x=1325, y=20)
-        Label(self.root, text="Mode used =", font=("Arial", 14)).place(x=1200, y=25)
+        dropdown_mode.grid(row=0, column=9, padx=9, pady=10)
+        Label(self.root, text="Mode used =", font=("Arial", 14)).grid(row=0, column=8, padx=10, pady=10)
 
     def create_pid_controls(self):
         self.Kp_x = tk.DoubleVar(value=0.42)
@@ -255,12 +253,12 @@ class GUI:
         self.create_pid_slider_set("X", 150)
         self.create_pid_slider_set("Y", 250)
 
-        Label(self.root, text="Max velocity:", font=("Arial", 12)).place(x=400, y=370)
+        Label(self.root, text="Max velocity:", font=("Arial", 12)).grid(row=9, column=0)
         self.max_velocity = tk.DoubleVar(value=60)
         velocity_slider = tk.Scale(self.root, from_=0, to=60, resolution=1, 
                                   orient="horizontal", variable=self.max_velocity, 
-                                  length=300)
-        velocity_slider.place(x=400, y=400)
+                                  length=200)
+        velocity_slider.grid(row=9, column=1)
 
     def create_pid_slider_set(self, axis, y_pos):
         kp_label = tk.Label(self.root, text=f"Kp-{axis} (Proportional)")
@@ -294,30 +292,30 @@ class GUI:
         self.t1, self.t2 = tk.IntVar(value=166), tk.IntVar(value=171)
 
         sliders_config = [
-            (self.h_min, "Hue Min:", 50, 60),
-            (self.h_max, "Hue Max:", 100, 110),
-            (self.s_min, "Sat Min:", 150, 160),
-            (self.s_max, "Sat Max:", 200, 210),
-            (self.v_min, "Value Min:", 250, 260),
-            (self.v_max, "Value Max:", 300, 310),
-            (self.t1, "Threshold1", 350, 370),
-            (self.t2, "Threshold2", 400, 420)
+            (self.h_min, "Hue Min:", 1),
+            (self.h_max, "Hue Max:", 2),
+            (self.s_min, "Sat Min:", 3),
+            (self.s_max, "Sat Max:", 4),
+            (self.v_min, "Value Min:", 5),
+            (self.v_max, "Value Max:", 6),
+            (self.t1, "Threshold1", 7),
+            (self.t2, "Threshold2", 8)
         ]
 
-        for var, text, y_pos, label_y in sliders_config:
+        for var, text, row in sliders_config:
             Scale(self.root, from_=0, to=255, orient="horizontal", 
-                  variable=var, length=200).place(x=100, y=y_pos)
-            Label(self.root, text=text, font=("Arial", 12)).place(x=10, y=label_y)
+                  variable=var, length=200).grid(row=row, column=1)
+            Label(self.root, text=text, font=("Arial", 12)).grid(row=row, column=0)
 
     def create_velocity_display(self):
         self.lr_label = Label(self.root, text="Left-Right Velocity = 0", font=("Arial", 14))
-        self.lr_label.place(x=400, y=170)
+        self.lr_label.grid(column=3, row=4)
         self.fb_label = Label(self.root, text="For-Back Velocity = 0", font=("Arial", 14))
-        self.fb_label.place(x=400, y=220)
+        self.fb_label.grid(column=3, row=5)
         self.ud_label = Label(self.root, text="Up-Down Velocity = 0", font=("Arial", 14))
-        self.ud_label.place(x=400, y=270)
+        self.ud_label.grid(column=3, row=6)
         self.yaw_label = Label(self.root, text="Yaw Velocity = 0", font=("Arial", 14))
-        self.yaw_label.place(x=400, y=320)
+        self.yaw_label.grid(column=3, row=7)
 
     def create_video_panels(self):
         container = tk.Frame(self.root)
