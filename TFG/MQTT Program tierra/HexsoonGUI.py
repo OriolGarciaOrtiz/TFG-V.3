@@ -12,6 +12,7 @@ import queue
 import paho.mqtt.client as mqtt
 import json
 import time
+from colorama import init, Fore
 
 
 class GUI:
@@ -23,6 +24,8 @@ class GUI:
 
         self.misson_panel_heigth = 400
         self.misson_panel_width = int(self.misson_panel_heigth * 16/9)
+
+        init(autoreset=True)
         
         # Thread-safe queues
         self.video_queue = queue.Queue(maxsize=2)
@@ -64,6 +67,9 @@ class GUI:
         self.thread_velocities.start()  
         self.thread_get_frame.start()
         self.thread_get_mission_planner.start()
+
+
+
         
         # Start main update loop
         self.update_frame()
@@ -78,7 +84,6 @@ class GUI:
         self.create_hsv_sliders()
         self.create_pid_controls()
         self.create_velocity_display()
-        self.create_status_label()
 
     def on_message(self, client, userdata, msg): 
         if self.controller.try_mode == "Practice":
@@ -93,11 +98,9 @@ class GUI:
             self.controller.for_back = float(data.get("for_back", self.controller.for_back))
             self.controller.up_down = float(data.get("up_down", self.controller.up_down))
             self.controller.yaw = float(data.get("yaw", self.controller.yaw))
-            #self.controller.uncoded_original_frame = data.get("frame_display", self.controller.uncoded_original_frame)
-            #self.controller.uncoded_detected_frame = data.get("img_contour", self.controller.uncoded_detected_frame)
             self.controller.is_connected = data.get("is_connected", self.controller.is_connected)
         except Exception as e:
-            self.log(f"Error setting data: {e}")
+            print(Fore.RED + f"Error setting data: {e}")
 
     def prepare_all_data(self) -> str:
         """Prepare COMPLETE data package with ALL parameters"""
@@ -153,18 +156,18 @@ class GUI:
                 
                 self.clock_start = now
             except Exception as e:
-                self.log(f"Error sending data: {e}")
+                print(Fore.RED + f"Error sending data: {e}")
 
     def run_in_thread(self, target_func, status_msg="Executing..."):
         """Helper to run actions in background threads"""
         def task():
             try:
-                self.log(status_msg)
+                print(Fore.BLUE + status_msg)
                 result = target_func()  # Call the function
-                self.log("Action complete")
+                print(Fore.GREEN + "Action complete")
                 return result
             except Exception as e:
-                self.log(f"Error: {str(e)}")
+                print(Fore.RED + f"Error: {str(e)}")
                 # Show error message in GUI
         
         # Start the thread
@@ -184,15 +187,6 @@ class GUI:
         self.battery_label = Label(self.root, text="Battery: -", font=("Arial", 14))
         self.battery_label.grid(row=0, column=2, padx=10, pady=10)
 
-    def create_status_label(self):
-        self.status_var = tk.StringVar(value="Ready")
-        status_label = tk.Label(self.root, textvariable=self.status_var, 
-                               font=("Consolas", 12), fg="white", bg="black")
-        status_label.place(x=10, y=735, width=700, height=20)
-
-    def log(self, msg):
-        #self.root.after(0, lambda: self.status_var.set(msg))
-        print(msg)
 
     def create_control_buttons(self):
         # Arm Button - use controller.arm directly
@@ -355,6 +349,19 @@ class GUI:
         self.video_labels.append(mission_lbl)
 
     @staticmethod
+    def get_mission_planner_hwnd():
+        result = []
+
+        def enum_handler(hwnd, _):
+            if win32gui.IsWindowVisible(hwnd):
+                title = win32gui.GetWindowText(hwnd)
+                if "Mission Planner" in title:
+                    result.append(hwnd)
+
+        win32gui.EnumWindows(enum_handler, None)
+        return result[0] if result else None
+
+    @staticmethod
     def safe_print_window(hwnd, hdc, flags):
         user32 = ctypes.windll.user32
         user32.PrintWindow.restype = ctypes.c_bool
@@ -362,18 +369,9 @@ class GUI:
 
     def get_mission_planner_frame(self):
         try:
-            hwnd = win32gui.FindWindow(None, "Mission Planner 1.3.83 build 1.3.9384.38258 ArduCopter V4.7.0-dev (661d2eab) on")
-            if hwnd == 0:
-                def enumHandler(h, result):
-                    title = win32gui.GetWindowText(h)
-                    if "Mission Planner 1.3.83 build 1.3.9384.38258 ArduCopter V4.7.0-dev" in title:
-                        result.append(h)
-
-                result = []
-                win32gui.EnumWindows(enumHandler, result)
-                if not result:
-                    return None
-                hwnd = result[0]
+            hwnd = self.get_mission_planner_hwnd()
+            if not hwnd:
+                return None
 
             left, top, right, bot = win32gui.GetClientRect(hwnd)
             width = right - left
@@ -391,7 +389,6 @@ class GUI:
 
             result = self.safe_print_window(hwnd, saveDC.GetSafeHdc(), 1)
 
-            bmpinfo = saveBitMap.GetInfo()
             bmpstr = saveBitMap.GetBitmapBits(True)
             img = np.frombuffer(bmpstr, dtype=np.uint8)
             img.shape = (height, width, 4)
@@ -406,10 +403,11 @@ class GUI:
                 return None
 
             img = cv2.resize(img, (self.misson_panel_width, self.misson_panel_heigth))
+            
             return img
 
         except Exception as e:
-            self.log(f"Error capturing Mission Planner: {e}")
+            print(Fore.RED + f"Error capturing Mission Planner: {e}")
             return None
 
     def transfer_data(self):
@@ -480,12 +478,11 @@ class GUI:
                 time.sleep(0.033)  # ~30 FPS
                 
             except tk.TclError:
-                # GUI destroyed, stop thread
                 break
             except queue.Empty:
                 time.sleep(0.01)
             except Exception as e:
-                self.log(f"Video thread error: {e}")
+                print(Fore.RED + f"Video thread error: {e}")
                 time.sleep(0.1)
 
     def update_video_frames(self, frames):
@@ -497,7 +494,7 @@ class GUI:
                     lbl.imgtk = imgtk
                     lbl.config(image=imgtk)
         except Exception as e:
-            self.log(f"Error updating video frames: {e}")
+            print(Fore.RED + f"Error updating video frames: {e}")
 
     def thread_velocities_func(self):
         """Thread for updating velocity displays"""
@@ -520,7 +517,7 @@ class GUI:
             except queue.Empty:
                 time.sleep(0.01)
             except Exception as e:
-                self.log(f"Velocity thread error: {e}")
+                print(Fore.RED + f"Velocity thread error: {e}")
                 time.sleep(0.1)
 
     def update_velocity_labels(self):
@@ -534,13 +531,11 @@ class GUI:
         """Thread for getting camera frames"""
         while self.running:
             try:
-                # Transfer data to controller first
-                self.transfer_data()
                 
                 # Get frames based on mode
-                if self.simulation_var.get() == "Practice":
+                if self.controller.try_mode == "Practice":
                     original_frame, detected_frame = self.controller.get_frame("Practice")
-                elif self.simulation_var.get() == "Simulation":
+                elif self.controller.try_mode == "Simulation":
                     original_frame, detected_frame = self.controller.get_frame("Simulation")
                 else:
                     original_frame, detected_frame = None, None
@@ -564,7 +559,7 @@ class GUI:
             except queue.Full:
                 time.sleep(0.01)
             except Exception as e:
-                self.log(f"Frame thread error: {e}")
+                print(Fore.RED + f"Frame thread error: {e}")
                 time.sleep(0.1)
 
     def thread_mission_planner_func(self):
@@ -582,11 +577,13 @@ class GUI:
             except queue.Full:
                 time.sleep(0.01)
             except Exception as e:
-                self.log(f"Mission planner thread error: {e}")
+                print(Fore.RED + f"Mission planner thread error: {e}")
                 time.sleep(0.5)
 
     def update_frame(self):
         try:
+
+            self.transfer_data()
 
             # Update connection status
             if self.controller.is_connected:
@@ -605,7 +602,7 @@ class GUI:
                 self.send_data()
             
         except Exception as e:
-            self.log(f"Error in update_frame: {e}")
+            print(Fore.RED + f"Error in update_frame: {e}")
         
         # Schedule next update
         self.root.after(30, self.update_frame)

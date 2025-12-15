@@ -4,7 +4,7 @@ import traceback
 from aiortc import RTCPeerConnection, RTCSessionDescription
 from websockets import connect
 from HexsoonGUI import GUI
-
+from colorama import init, Fore
 
 class DroneVideoReceiver:
     """
@@ -19,6 +19,11 @@ class DroneVideoReceiver:
         self.connected = False
         self.pc = None
 
+        init(autoreset=True)
+
+        self.ip_adress = "ws://127.0.0.1:9999"             # En caso que se quieran hacer pruebas en local
+        #self.ip_adress = "ws://192.168.1.102:9999"       # Para cuando se quieran hacer pruebas de vuelo
+
     async def receive_frame(self, track, track_label):
         """
         Recibir frames de un track específico y actualizar la GUI.
@@ -28,7 +33,12 @@ class DroneVideoReceiver:
 
         try:
             while self.running:
+
                 frame = await track.recv()
+
+                if frame is None: 
+                    return
+
                 img = frame.to_ndarray(format="bgr24")
 
                 # Actualizar GUI según track
@@ -37,38 +47,35 @@ class DroneVideoReceiver:
                 elif "detected" in track_label:
                     self.gui.controller.detected_frame_RTC = img
                 else:
-                    print(f"[WARNING] Track unknown: {track_label}")
+                    print(Fore.YELLOW + f"[WARNING] Track unknown: {track_label}")
 
                 self.frame_count += 1
 
-                # Debug cada 10 frames
-                if self.frame_count % 10 == 0:
-                    print(f"[DEBUG] Frame #{self.frame_count} | pts={frame.pts}, time_base={frame.time_base}")
-
-                # FPS cada 60 frames
-                if self.frame_count % 60 == 0:
-                    elapsed = asyncio.get_event_loop().time() - self.start_time
-                    fps = self.frame_count / elapsed if elapsed > 0 else 0
-                    print(f"Frames received: {self.frame_count}, FPS: {fps:.1f}")
-
         except Exception as e:
-            print(f"[ERROR] Error receiving frames: {e}")
+            print(Fore.RED + f"[ERROR] Error receiving frames: {e}")
             traceback.print_exc()
 
-    async def connect_to_drone(self, websocket_url="ws://192.168.1.102:9999"):
+    async def connect_to_drone(self):
         """
-        Conectar al dron mediante WebSocket + WebRTC y recibir ambos tracks.
+        Conectar al dron mediante WebSocket + WebRTC solo si el modo es 'Practice'.
         """
+        # Esperar hasta que el usuario seleccione Practice
+        while self.gui.controller.try_mode != "Practice" and self.running:
+            await asyncio.sleep(0.1)
+
+        if not self.running:
+            return  # Salir si se cerró la aplicación antes de Practice
+
         if self.connected:
-            print("[WARNING] Already connected to drone.")
+            print(Fore.YELLOW + "[WARNING] Already connected to drone.")
             return
 
-        print(f"Connecting to drone at {websocket_url}")
+        print(Fore.BLUE + f"Connecting to drone at {self.ip_adress}")
         self.pc = RTCPeerConnection()
 
         try:
-            async with connect(websocket_url) as websocket:
-                print("Connected to drone")
+            async with connect(self.ip_adress) as websocket:
+                print(Fore.GREEN + "Connected to WebRTC")
 
                 # Registrar callback para recibir tracks
                 @self.pc.on("track")
@@ -105,33 +112,35 @@ class DroneVideoReceiver:
                     }))
 
                     self.connected = True
-                    print("✅ WebRTC connection established. Receiving frames...")
+                    print(Fore.GREEN + "WebRTC connection established. Receiving frames...")
 
                     # Mantener conexión viva mientras self.running
                     while self.running:
                         await asyncio.sleep(0.1)
 
                 else:
-                    print(f"[WARNING] Unexpected message from drone: {data.get('type')}")
+                    print(Fore.YELLOW + f"[WARNING] Unexpected message from drone: {data.get('type')}")
 
         except ConnectionRefusedError:
-            print(f"[ERROR] Cannot connect to {websocket_url}. Ensure drone server is running.")
+            print(Fore.RED + f"[ERROR] Cannot connect to {self.ip_adress}. Ensure drone server is running.")
         except Exception as e:
-            print(f"[ERROR] Ground station error: {e}")
+            print(Fore.RED + f"[ERROR] Ground station error: {e}")
             traceback.print_exc()
         finally:
             if self.pc:
                 await self.pc.close()
             self.connected = False
-            print(f"Total frames received: {self.frame_count}")
-            print("Drone connection closed.")
+            print(Fore.BLUE + "Drone connection closed.")
 
-    def start(self, websocket_url="ws://192.168.1.102:9999"):
+    def start(self):
         """
-        Ejecutar la conexión al dron en un loop asyncio.
+        Ejecutar la conexión al dron en un loop asyncio dentro del hilo.
         """
         try:
-            asyncio.run(self.connect_to_drone(websocket_url))
+            # Crear un nuevo loop de asyncio dentro del hilo
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.connect_to_drone())
         except Exception as e:
-            print(f"[ERROR] Exception in receiver start: {e}")
+            print(Fore.RED + f"[ERROR] Exception in receiver start: {e}")
             traceback.print_exc()

@@ -5,6 +5,7 @@ import numpy as np
 from pymavlink import mavutil
 from dronLink.modules.dron_move import _prepare_command_mov
 import base64
+from colorama import init, Fore
 
 class HexsoonController:
     def __init__(self):
@@ -12,11 +13,13 @@ class HexsoonController:
         self.dron = Dron()
         self.cap = None
 
+        init(autoreset=True)
+
         try:
             self.model = YOLO("best_RC_Final.pt")
-            print("YOLO model loaded successfully.")
+            print(Fore.GREEN + "YOLO model loaded successfully.")
         except Exception as e:
-            print("Could not load YOLO model:", e)
+            print(Fore.RED + "Could not load YOLO model:", e)
             self.model = None
 
         self.panel_width = 320
@@ -80,19 +83,16 @@ class HexsoonController:
         if self.try_mode == "Simulation":
             self.dron.connect('tcp:127.0.0.1:5763', 115200)
 
-            #self.log("Configuring yaw lock (stabilizeYaw)...")
             self.stabilizeYaw()
-            #self.log("Yaw stabilized (no automatic rotation).")
 
         elif self.try_mode == "Practice":
             self.dron.connect('tcp:127.0.0.1:5763', 115200)
-            #self.log("Connecting to real drone on COM3...")
             #self.dron.connect('COM3', 57600)
             self.stabilizeYaw()
             pass
 
         else:
-            raise ValueError("Unknown connection mode selected")
+            raise ValueError(Fore.RED + "Unknown connection mode selected")
         
 
         self.is_connected = True
