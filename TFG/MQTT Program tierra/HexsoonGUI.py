@@ -67,9 +67,6 @@ class GUI:
         self.thread_velocities.start()  
         self.thread_get_frame.start()
         self.thread_get_mission_planner.start()
-
-
-
         
         # Start main update loop
         self.update_frame()
@@ -240,6 +237,12 @@ class GUI:
         dropdown_mode = tk.OptionMenu(self.root, self.opt_cam, *Mode_cam)
         dropdown_mode.grid(row=0, column=9, padx=9, pady=10)
         Label(self.root, text="Mode used =", font=("Arial", 14)).grid(row=0, column=8, padx=10, pady=10)
+
+        Label(self.root, text="Camera Used =", font=("Arial", 14)).grid(row=1, column=6, padx=10, pady=10)
+        Opt_cam = ["Default Cam", "Raspi Cam", "Panormaic Cam"]
+        self.camera_option = tk.StringVar(value="Default Camera")
+        dropdown_cam_opt = tk.OptionMenu(self.root, self.camera_option, *Opt_cam)
+        dropdown_cam_opt.grid(row=1, column=7, padx=9, pady=10)
 
     def create_pid_controls(self):
         self.Kp_x = tk.DoubleVar(value=0.42)
@@ -426,6 +429,7 @@ class GUI:
         self.controller.view_mode = self.opt_cam.get()
         self.controller.take_off_alt = float(self.takeoff_height.get())
         self.controller.try_mode = self.simulation_var.get()
+        self.controller.camera_option = self.camera_option.get()
 
     def thread_video_func(self):
         """Thread for processing and displaying video frames"""

@@ -19,6 +19,8 @@ class DroneVideoReceiver:
         self.connected = False
         self.pc = None
 
+        self.connection_lock = asyncio.Lock()
+
         init(autoreset=True)
 
         self.ip_adress = "ws://127.0.0.1:9999"             # En caso que se quieran hacer pruebas en local
@@ -32,7 +34,7 @@ class DroneVideoReceiver:
         self.start_time = asyncio.get_event_loop().time()
 
         try:
-            while self.running:
+            while self.connected:
 
                 frame = await track.recv()
 
@@ -59,19 +61,15 @@ class DroneVideoReceiver:
         """
         Conectar al dron mediante WebSocket + WebRTC solo si el modo es 'Practice'.
         """
-        # Esperar hasta que el usuario seleccione Practice
-        while self.gui.controller.try_mode != "Practice" and self.running:
-            await asyncio.sleep(0.1)
+        
+        async with self.connection_lock:
 
-        if not self.running:
-            return  # Salir si se cerró la aplicación antes de Practice
+            if self.connected:
+                print(Fore.YELLOW + "[WARNING] Already connected to drone.")
+                return
 
-        if self.connected:
-            print(Fore.YELLOW + "[WARNING] Already connected to drone.")
-            return
-
-        print(Fore.BLUE + f"Connecting to drone at {self.ip_adress}")
-        self.pc = RTCPeerConnection()
+            print(Fore.BLUE + f"Connecting to drone at {self.ip_adress}")
+            self.pc = RTCPeerConnection()
 
         try:
             async with connect(self.ip_adress) as websocket:
@@ -114,8 +112,7 @@ class DroneVideoReceiver:
                     self.connected = True
                     print(Fore.GREEN + "WebRTC connection established. Receiving frames...")
 
-                    # Mantener conexión viva mientras self.running
-                    while self.running:
+                    while self.connected:
                         await asyncio.sleep(0.1)
 
                 else:
@@ -132,15 +129,49 @@ class DroneVideoReceiver:
             self.connected = False
             print(Fore.BLUE + "Drone connection closed.")
 
+
+    def should_connect_rtc(self) -> bool:
+        return (
+            self.gui.controller.try_mode in ("Practice", "Simulation") and
+            self.gui.controller.camera_option in ("Raspi Cam", "Panoramic Cam")
+        )
+    
+    async def disconnect_from_drone(self):
+        async with self.connection_lock:
+            if not self.connected:
+                return
+
+            print(Fore.BLUE + "Disconnecting from drone...")
+            self.connected = False
+
+    async def connection_manager(self):
+        last_state = None
+
+        while True:
+            current_state = self.should_connect_rtc()
+
+            if current_state != last_state:
+                if current_state and not self.connected:
+                    print(Fore.GREEN + "[RTC] Conditions met → connecting")
+                    asyncio.create_task(self.connect_to_drone())
+
+                elif not current_state and self.connected:
+                    print(Fore.YELLOW + "[RTC] Conditions not met → disconnecting")
+                    await self.disconnect_from_drone()
+
+                last_state = current_state
+
+            await asyncio.sleep(0.2)
+
+
     def start(self):
-        """
-        Ejecutar la conexión al dron en un loop asyncio dentro del hilo.
-        """
         try:
-            # Crear un nuevo loop de asyncio dentro del hilo
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            loop.run_until_complete(self.connect_to_drone())
+
+            loop.create_task(self.connection_manager())
+            loop.run_forever()
+
         except Exception as e:
             print(Fore.RED + f"[ERROR] Exception in receiver start: {e}")
             traceback.print_exc()

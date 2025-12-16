@@ -54,6 +54,8 @@ class HexsoonController:
 
         self.try_mode = "Practice"
 
+        self.camera_option = "Default Camera"
+
         self.click_connect = False
         self.click_disconnect = False
 
@@ -169,65 +171,33 @@ class HexsoonController:
         Returns (original, detected) depending on the input mode and try_mode.
         """
 
-        # ------------------------- RASPBERRY PI MODES -------------------------
-        if mode == "Raspi":
-
-            # ---------------------------------------------------
-            # SIMULATION MODE (Raspberry sends ONLY original frame)
-            # ---------------------------------------------------
-            if self.try_mode == "Simulation":
-                if self.uncoded_original_frame is None:
-                    return None, None
-
-                try:
-                    decoded_original = self.base64_to_image(self.uncoded_original_frame)
-                except:
-                    return None, None
-
-                return decoded_original, decoded_original  # Only original frame is available
-
-            # ---------------------------------------------------
-            # PRACTICE MODE (Raspberry sends ORIGINAL + DETECTED)
-            # ---------------------------------------------------
-            elif self.try_mode == "Practice":
-                # If both frames are missing, return None
-                if self.uncoded_original_frame is None and self.uncoded_detected_frame is None:
-                    
-                    return None, None
-                
-                elif self.uncoded_original_frame is not None and self.uncoded_detected_frame is None:
-                    
-                    decoded_original = self.base64_to_image(self.uncoded_original_frame) if self.uncoded_original_frame else None
-                    return decoded_original, decoded_original
-                
-                else:
-
-                    # Decode frames if they exist
-                    decoded_original = self.base64_to_image(self.uncoded_original_frame) if self.uncoded_original_frame else None
-                    decoded_detected = self.base64_to_image(self.uncoded_detected_frame) if self.uncoded_detected_frame else None
-
-                    return decoded_original, decoded_detected
-
-            else:
-                return None, None
-
         # ------------------------- PC CAMERA MODE -------------------------
-        elif mode == "Video Cam":
-            if self.cap is None:
-                self.cap = cv2.VideoCapture(0)
+        if mode == "Default Cam":
 
-            ret, frame = self.cap.read()
-            if not ret:
+            try: 
+                if self.cap is None:
+                    self.cap = cv2.VideoCapture(0)
+
+                ret, frame = self.cap.read()
+                if not ret:
+                    return None, None
+
+                return frame, None  # No detected frame for webcam
+            
+            except: 
                 return None, None
-
-            return frame, None  # No detected frame for webcam
         
         # ------------------------- PC CAMERA MODE -------------------------
-        elif mode == "WebRTC":
+        elif mode == "Raspi Cam":
             if self.original_frame_RTC is None:
                 return None, None
 
             return self.original_frame_RTC, self.detected_frame_RTC
+        
+        # ------------------------- PC CAMERA MODE -------------------------
+        elif mode == "Panormaic Cam":
+            
+            return None, None
 
         # ------------------------- UNKNOWN MODE -------------------------
         return None, None
@@ -389,18 +359,44 @@ class HexsoonController:
 
     def get_frame(self, mode: str):
 
-        # SIMULATION: use Raspberry original frame and process on PC
         if mode == "Simulation":
-            original_frame, _ = self.cap_frame("Raspi")
+            
+            if self.camera_option == "Default Cam": 
+            
+                original_frame, _ = self.cap_frame(self.camera_option)
 
-            if original_frame is None:
+                if original_frame is None:
+                    return None, None
+
+                return self.get_detected_frame(original_frame)
+            
+
+            elif self.camera_option == "Raspi Cam": 
+
+                original_frame, _ = self.cap_frame(self.camera_option)
+
+                if original_frame is None:
+                    return None, None
+
+                return self.get_detected_frame(original_frame)
+
+            elif self.camera_option == "Panormaic Cam":
+
                 return None, None
 
-            return self.get_detected_frame(original_frame)
 
-        # PRACTICE: Raspberry already sends both frames
         elif mode == "Practice":
-            return self.cap_frame("WebRTC")
+
+            if self.camera_option == "Raspi Cam": 
+
+                if self.original_frame_RTC is None:
+                    return None, None
+
+                return self.original_frame_RTC, self.detected_frame_RTC
+
+            elif self.camera_option == "Panormaic Cam":
+
+                return self.get_detected_frame(self.camera_option)
 
         # UNKNOWN
         return None, None
