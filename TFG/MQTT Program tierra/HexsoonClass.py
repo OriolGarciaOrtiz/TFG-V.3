@@ -376,11 +376,12 @@ class HexsoonController:
                 original_frame, _ = self.cap_frame(self.camera_option)
 
                 if original_frame is None:
+
                     return None, None
 
                 return self.get_detected_frame(original_frame)
 
-            elif self.camera_option == "Panormaic Cam":
+            elif self.camera_option == "Panoramic Cam":
 
                 return None, None
 
@@ -396,7 +397,7 @@ class HexsoonController:
 
             elif self.camera_option == "Panormaic Cam":
 
-                return self.get_detected_frame(self.camera_option)
+                return self.cap_frame(self.camera_option)
 
         # UNKNOWN
         return None, None

@@ -117,6 +117,7 @@ class GUI:
             'view_mode': self.opt_cam.get(),
             'try_mode': self.simulation_var.get(),
             'PID_mode': self.opt.get(),
+            'camera_option': self.camera_option.get(),
             
             # PID values
             'Kp_x': self.Kp_x.get(),

@@ -56,6 +56,8 @@ class GUI:
         self.take_off_alt = 3 
         
         self.try_mode = "Practice" 
+
+        self.cam_mode = "Default Cam"
         
         # Button states
         self.connect_click = False 
@@ -127,6 +129,8 @@ class GUI:
         # Mode
         self.try_mode = data.get("try_mode", self.try_mode)
 
+        self.cam_mode = data.get("camera_option", self.cam_mode)
+
         # Button states
         self.connect_click = self._to_bool(data.get("connect_click", False))
         self.disconnect_click = self._to_bool(data.get("disconnect_mode", False))
@@ -138,9 +142,7 @@ class GUI:
 
     # Prepare and send data -----------------------------
 
-    def prepare_data(self, original_frame, detection_frame):
-        #_, buffer_original = cv2.imencode(".jpg", original_frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
-        #_, buffer_detected = cv2.imencode(".jpg", detection_frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
+    def prepare_data(self):
 
         data = {
             "left_right": self.controller.left_right,
@@ -149,11 +151,6 @@ class GUI:
             "yaw": self.controller.yaw,
             "is_connected": self.controller.is_connected,
         }
-        
-        '''
-                    "frame_display": base64.b64encode(buffer_original).decode(),
-            "img_contour": base64.b64encode(buffer_detected).decode(),
-        '''
 
         self.send_data(data)
 
@@ -323,7 +320,7 @@ class GUI:
                 self.controller.for_back = 0
                 self.controller.yaw = 0
 
-            self.prepare_data(frame_display, img_contour)
+            self.prepare_data()
 
             self.frame_display = frame_display
             self.img_contour = img_contour

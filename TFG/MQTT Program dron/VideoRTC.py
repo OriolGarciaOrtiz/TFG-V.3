@@ -11,10 +11,9 @@ class DroneVideoTrack(VideoStreamTrack):
         super().__init__()
         self.frame = np.zeros((240, 320, 3), dtype=np.uint8)
 
-        self.is_connected = False  # Controlado desde la GUI
+        self.is_connected = False
 
     async def recv(self):
-        # Espera hasta que se conecte un cliente
         while not self.is_connected:
             await asyncio.sleep(0.1)
 
@@ -23,7 +22,6 @@ class DroneVideoTrack(VideoStreamTrack):
         frame.pts = pts
         frame.time_base = time_base
 
-        # Limitar FPS a 30
         await asyncio.sleep(1 / 30)
         return frame
 
@@ -33,6 +31,8 @@ class WebRTCServer:
     def __init__(self, video_track_original, video_track_detected):
         self.video_track_original = video_track_original
         self.video_track_detected = video_track_detected
+
+        self.camera_option = "Default Cam"
 
     async def handle_client(self, websocket):
         print("🖥️ Cliente conectado")
@@ -64,6 +64,11 @@ class WebRTCServer:
                         type=data["sdp_type"]
                     )
                     await pc.setRemoteDescription(answer)
+
+                    enabled = (self.camera_option == "Raspi Cam")
+
+                    self.video_track_detected.is_connected = enabled
+                    self.video_track_detected.is_connected = enabled
                     print("✅ WebRTC conectado")
 
         except ConnectionClosed:
@@ -71,6 +76,8 @@ class WebRTCServer:
         except Exception as e:
             print(f"❌ Error en handler RTC: {e}")
         finally:
+            self.video_track_original.is_connected = False
+            self.video_track_detected.is_connected = False
             await pc.close()
             print("🧹 Cerrando recursos RTC")
 

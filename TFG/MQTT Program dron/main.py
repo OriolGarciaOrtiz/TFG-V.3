@@ -29,6 +29,8 @@ class DroneLauncher:
                 self.video_track_original.is_connected = self.gui.controller.is_connected
                 self.video_track_detected.is_connected = self.gui.controller.is_connected
 
+                self.webrtc = self.gui.cam_mode
+
             time.sleep(0.01)
 
 

@@ -30,7 +30,8 @@ class DroneVideoReceiver:
         """
         Recibir frames de un track específico y actualizar la GUI.
         """
-        await asyncio.sleep(0.5)
+        while not self.connected:
+            await asyncio.sleep(0.05)
         self.start_time = asyncio.get_event_loop().time()
 
         try:
@@ -78,6 +79,7 @@ class DroneVideoReceiver:
                 # Registrar callback para recibir tracks
                 @self.pc.on("track")
                 def on_track(track):
+                    print(f"[DEBUG] on_track called: kind={track.kind}")
                     if track.kind != "video":
                         return
 
