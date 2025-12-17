@@ -112,6 +112,8 @@ class HexsoonController:
     def take_off_drone(self):
         
         if self.is_connected:
+
+            print(Fore.GREEN + "Taking off...")
             
             self.dron.takeOff(self.take_off_alt)
 
@@ -196,9 +198,19 @@ class HexsoonController:
         
         # ------------------------- PC CAMERA MODE -------------------------
         elif mode == "Panormaic Cam":
-            
-            return None, None
 
+            try:
+            
+                self.cap = cv2.VideoCapture(1)
+
+                ret, frame = self.cap.read()
+                if not ret:
+                    return None, None
+                
+                return frame, None
+            except:
+                return None, None
+            
         # ------------------------- UNKNOWN MODE -------------------------
         return None, None
 
@@ -383,7 +395,13 @@ class HexsoonController:
 
             elif self.camera_option == "Panoramic Cam":
 
-                return None, None
+                original_frame, _  = self.cap_frame(self.camera_option)
+
+                if not original_frame:
+
+                    return None, None
+            
+                return self.get_detected_frame()
 
 
         elif mode == "Practice":
@@ -397,7 +415,13 @@ class HexsoonController:
 
             elif self.camera_option == "Panormaic Cam":
 
-                return self.cap_frame(self.camera_option)
+                original_frame, _  = self.cap_frame(self.camera_option)
+
+                if not original_frame:
+
+                    return None, None
+            
+                return self.get_detected_frame()
 
         # UNKNOWN
         return None, None

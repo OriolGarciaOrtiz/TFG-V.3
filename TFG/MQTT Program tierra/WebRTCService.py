@@ -79,7 +79,6 @@ class DroneVideoReceiver:
                 # Registrar callback para recibir tracks
                 @self.pc.on("track")
                 def on_track(track):
-                    print(f"[DEBUG] on_track called: kind={track.kind}")
                     if track.kind != "video":
                         return
 

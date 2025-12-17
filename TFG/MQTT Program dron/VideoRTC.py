@@ -28,7 +28,7 @@ class DroneVideoTrack(VideoStreamTrack):
 
 
 class WebRTCServer:
-    def __init__(self, video_track_original, video_track_detected):
+    def __init__(self, video_track_original: DroneVideoTrack, video_track_detected: DroneVideoTrack):
         self.video_track_original = video_track_original
         self.video_track_detected = video_track_detected
 
