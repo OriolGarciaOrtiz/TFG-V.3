@@ -1,3 +1,5 @@
+import time
+
 from dronLink.Dron import Dron
 from ultralytics import YOLO
 import cv2
@@ -12,6 +14,7 @@ class HexsoonController:
         self.is_connected = False
         self.dron = Dron()
         self.cap = None
+        self.take_off_finalizado=False
 
         init(autoreset=True)
 
@@ -50,7 +53,7 @@ class HexsoonController:
 
         self.view_mode = "Front View"  # or "Down View" etc.
 
-        self.take_off_alt = 3
+        self.take_off_alt = 5
 
         self.try_mode = "Practice"
 
@@ -78,16 +81,6 @@ class HexsoonController:
 
     from pymavlink import mavutil
 
-    def is_taking_off(self):
-        vehicle = getattr(self.dron, "vehicle", None)
-        if vehicle is None:
-            return False
-
-        msg = vehicle.recv_match(type='EXTENDED_SYS_STATE', blocking=False)
-        if msg is None:
-            return False
-
-        return msg.landed_state == mavutil.mavlink.MAV_LANDING_TAKEOFF_STATE_TAKEOFF
 
 
     def connect_drone(self):
@@ -97,12 +90,12 @@ class HexsoonController:
         if self.try_mode == "Simulation":
             self.dron.connect('tcp:127.0.0.1:5763', 115200)
 
-            self.stabilizeYaw()
+            #self.stabilizeYaw()
 
         elif self.try_mode == "Practice":
             self.dron.connect('tcp:127.0.0.1:5763', 115200)
             #self.dron.connect('COM3', 57600)
-            self.stabilizeYaw()
+            #self.stabilizeYaw()
             pass
 
         else:
@@ -111,19 +104,8 @@ class HexsoonController:
 
         self.is_connected = True
 
-    def can_send_velocities(self):
-        vehicle = getattr(self.dron, "vehicle", None)
-        if vehicle is None:
-            return False
 
-        msg = vehicle.recv_match(type='EXTENDED_SYS_STATE', blocking=False)
-        if msg is None:
-            return False
-
-        return msg.landed_state == mavutil.mavlink.MAV_LANDING_TAKEOFF_STATE_IN_AIR
-
-
-    def disconnect_drone(self): 
+    def disconnect_drone(self):
         
         if self.is_connected:
             
@@ -131,15 +113,30 @@ class HexsoonController:
             self.is_connected = False  
             self.dron.disconnect()
 
-
     def take_off_drone(self):
-        
-        if self.is_connected and self.is_taking_off():
+        if not self.is_connected:
+            print("No está conectado")
+            return
 
-            print(Fore.GREEN + "Taking off...")
-            
-            self.dron.takeOff(self.take_off_alt)
+        print(Fore.GREEN + "Taking off...")
 
+
+        # 2️⃣ Armado
+        self.dron.arm()
+        time.sleep(0.5)
+
+        # 3️⃣ Takeoff
+        self.dron.takeOff(self.take_off_alt)
+
+        time.sleep(10)#Esperar x segundos a terminar el take off
+
+        # 5️⃣ Ahora SÍ: despegue completado
+        print(Fore.GREEN + "Takeoff completado")
+
+        self.take_off_finalizado = True
+
+        # 6️⃣ AHORA bloqueas el yaw
+        self.stabilizeYaw()
 
     def land_drone(self):
         
@@ -161,27 +158,23 @@ class HexsoonController:
             
             self.dron.arm()
 
-
     def set_velocity(self):
 
-        try: 
-
-            vehicle: mavutil.mavfile = getattr(self.dron, 'vehicle', None)
-
-            if vehicle is None:
-                return
-        
-            step_x = self.for_back / 100.0
-            step_y = self.left_right / 100.0
-            step_z = -self.up_down / 100.0
-
-            msg = _prepare_command_mov(self.dron, step_x, step_y, step_z, bodyRef=True)
-            vehicle.mav.send(msg)
-
-        except Exception as e:
+        # 🚫 BLOQUEO GLOBAL
+        if not self.take_off_finalizado:
             return
-        
-        
+
+        vehicle: mavutil.mavfile = getattr(self.dron, 'vehicle', None)
+        if vehicle is None:
+            return
+
+        step_x = self.for_back / 100.0
+        step_y = self.left_right / 100.0
+        step_z = -self.up_down / 100.0
+
+        msg = _prepare_command_mov(self.dron, step_x, step_y, step_z, bodyRef=True)
+        vehicle.mav.send(msg)
+
     def base64_to_image(self, b64_string):
         if b64_string is None:
             return None
@@ -355,18 +348,21 @@ class HexsoonController:
                 self.for_back = velocity_y
                 self.up_down = 0
 
-            if self.can_send_velocities():
-
+            if self.take_off_finalizado:
+                #print("Empieza a enviar velocidades")
                 self.integral_x += error_x
                 self.integral_y += error_y
                 self.set_velocity()
+
+
 
         else:
             self.left_right = 0
             self.for_back = 0
             self.up_down = 0
-
-            self.set_velocity()
+            self.integral_x=0
+            self.integral_y=0
+            #self.set_velocity()
 
 
     def get_detected_frame(self, frame):

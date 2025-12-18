@@ -186,15 +186,15 @@ class GUI:
 
     def create_control_buttons(self):
         # Arm Button - use controller.arm directly
-        self.arm_button = tk.Button(self.root, text="Arm", command=lambda: self.run_in_thread(self.controller.arm_drone))
-        self.arm_button.grid(column=4, row=1, padx=10, pady=10)
+        #self.arm_button = tk.Button(self.root, text="Arm", command=lambda: self.run_in_thread(self.controller.arm_drone))
+        #self.arm_button.grid(column=4, row=1, padx=10, pady=10)
 
         self.takeoff_height = tk.Entry(self.root, width=10)
         self.takeoff_height.insert(0, "8")
         self.takeoff_height.grid(column=2, row=1, padx=10, pady=10)
 
         # Take off button - use controller.take_off_drone directly
-        self.take_off_button = tk.Button(self.root, text="Take Off",
+        self.take_off_button = tk.Button(self.root, text="Arm and Take-off",
                                         command=lambda: self.run_in_thread(self.controller.take_off_drone))
         self.take_off_button.grid(column=3, row=1, padx=10, pady=10)
 
@@ -246,13 +246,13 @@ class GUI:
         dropdown_cam_opt.grid(row=1, column=7, padx=9, pady=10)
 
     def create_pid_controls(self):
-        self.Kp_x = tk.DoubleVar(value=0.42)
-        self.Ki_x = tk.DoubleVar(value=0.0005)
-        self.Kd_x = tk.DoubleVar(value=1.9)
+        self.Kp_x = tk.DoubleVar(value=0.1)
+        self.Ki_x = tk.DoubleVar(value=0)
+        self.Kd_x = tk.DoubleVar(value=0.5)
 
-        self.Kp_y = tk.DoubleVar(value=0.42)
-        self.Ki_y = tk.DoubleVar(value=0.0005)
-        self.Kd_y = tk.DoubleVar(value=1.9)
+        self.Kp_y = tk.DoubleVar(value=0.1)
+        self.Ki_y = tk.DoubleVar(value=0)
+        self.Kd_y = tk.DoubleVar(value=0.5)
 
         self.create_pid_slider_set("X", 150)
         self.create_pid_slider_set("Y", 250)
