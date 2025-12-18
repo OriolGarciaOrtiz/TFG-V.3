@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import tkinter as tk
 from tkinter import Scale, messagebox, OptionMenu, Label, StringVar
+from GeoTracker import GeoTracker
 from PIL import Image, ImageTk
 import cv2.aruco as aruco
 import glob
@@ -22,16 +23,16 @@ class GUI:
 
         self.controller = DroneController()
 
-        # === YOLO worker setup ===
-        self.yolo_queue = Queue(maxsize=1)
-        self.yolo_result = (None, 0, 0, [])
+
+        self.yolo_queue = Queue(maxsize=1) #Cola con capacidad de un frame
+        self.yolo_result = (None, 0, 0, []) #Inizializamos lo que tiene que devolver la función para cuando sea vacio
         self.yolo_lock = threading.Lock()
 
-        # Si ya tienes modelo cargado, lanza worker
-        self._yolo_worker = threading.Thread(target=self._yolo_worker_loop, daemon=True)
+
+        self._yolo_worker = threading.Thread(target=self._yolo_worker_loop, daemon=True) #Dejamos de forma infinita recorrer esta función en segundo plano
         self._yolo_worker.start()
 
-        # === GAME MODE worker setup ===
+
         self.game_queue = Queue(maxsize=1)
         self.game_result = (None, 0, 0, None,[])
         self.game_lock = threading.Lock()
@@ -39,9 +40,30 @@ class GUI:
         self._game_worker = threading.Thread(target=self._game_worker_loop, daemon=True)
         self._game_worker.start()
 
-        # === Cargar parámetros de cámara una vez ===
+        #GeoTracker
+        lat1=41.2754531
+        lon1=1.9862720
+        lat2=41.2754107
+        lon2=1.9862945
+        lat3 = 41.2753916
+        lon3 = 1.9862066
+        lat4=41.2754339
+        lon4=1.9861872
+        self.yaw_deg=0 #Habrá que fijar uno en concreto dependiendo de donde esté el norte
+        self.create_map_widget()
+        self.tracker = GeoTracker(
+            initial_lat=41.2754266,
+            initial_lon=1.9862395,
+            area_corners=[(lat1, lon1), (lat2, lon2), (lat3, lon3), (lat4, lon4)],
+            external_canvas=self.map_canvas
+        )
+        self.tracker.open_map_window()
+
+        self.last_position_time = time.time()
+
+
         try:
-            file_path = r"taller-dron-Tello\Lib\Parameters\parametros_camara_tello.npz"
+            file_path = r"C:\Tello\taller-dron-Tello\Lib\Parameters\parametros_camara_tello.npz"
             data = np.load(file_path)
             self.camera_matrix = data['camera_matrix']
             self.dist_coeffs = data['dist_coeffs']
@@ -66,7 +88,43 @@ class GUI:
         self.last_yolo_output = (None, 0, 0)
         self._yolo_thread = None
 
+        self.hsv_green_min = 35
+        self.hsv_green_max = 85
+        self.hsv_blue_min = 10
+        self.hsv_blue_max = 35
+
         #self.flask_server = None
+
+        self.last_detection_mode = None
+
+
+
+        self.hsv_widgets = []
+        self.hsv_slider_rows = []
+
+        self.game_widgets = []
+        self.game_actions = {}
+
+        self.color_game_widgets = []
+        self.color_actions = {}
+
+        # Offset de acciones (MoveUp, MoveDown, RotateCW…)
+        self.offset_lr = 0
+        self.offset_fb = 0
+        self.offset_ud = 0
+        self.offset_yaw = 0
+
+        # Tiempo (ms) de duración del offset
+        self.offset_duration_ms = 1000
+
+        # Timestamp para resetear
+        self.offset_timestamp = 0
+
+        # Para evitar repetir varias veces la misma acción
+        self.action_active = False
+        self.block_PID = False
+
+        self.last_valid_distance = None
 
         self.setup_gui()
 
@@ -109,6 +167,13 @@ class GUI:
         self.emergency_button = tk.Button(self.root, text="Emergency", command=self.controller.emergency)
         self.emergency_button.grid(row=0,column=7)
 
+    def create_map_widget(self):
+        map_frame = tk.LabelFrame(self.root, text="Mapa GEO", padx=5, pady=5)
+        map_frame.place(x=950, y=370)
+        # Canvas dentro del frame (aquí sí puede ser pack)
+        self.map_canvas = tk.Canvas(map_frame, width=500, height=375, bg="white")
+        self.map_canvas.pack()
+
     def create_calibration_buttons(self):
         self.btn_calibration_start = tk.Button(self.root, text="Start Calibration",
                                                command=lambda: threading.Thread(target=self.start_calibration,
@@ -128,19 +193,18 @@ class GUI:
     def create_mode_selectors(self):
 
         simulation_label = tk.Label(self.root, text="Simulation Mode:", font=("Arial", 12))
-        simulation_label.grid(row=1, column=3, padx=(20, 5), pady=10, sticky="w")
+        simulation_label.grid(row=1, column=3, padx=(20, 5), pady=10, sticky="w")  # Added sticky="w"
 
-        simulation_values = ["True", "False"]
         self.simulation_var = tk.StringVar(value="True")
-        simulation_dropdown = tk.OptionMenu(self.root, self.simulation_var, *simulation_values)
+        simulation_dropdown = tk.OptionMenu(self.root, self.simulation_var, "True", "False")
+
         simulation_dropdown.grid(row=1, column=3, padx=(175, 0), pady=10, sticky="w")
 
         detection_label = tk.Label(self.root, text="Detection Mode:", font=("Arial", 12))
         detection_label.grid(row=2, column=8)
 
-        detection_values = ["Color Contour", "Neural Network", "Game Mode", "Neural Network Exterior"]
         self.detection_var = tk.StringVar(value="Color Contour")
-        detection_dropdown = tk.OptionMenu(self.root, self.detection_var, *detection_values)
+        detection_dropdown = tk.OptionMenu(self.root, self.detection_var, "Color Contour", "Neural Network", "Neural Network RC2", "Game Mode", "Color Game Mode")
         detection_dropdown.grid(row=2, column=9)
 
         PID_values = ["P", "I", "D", "PD", "PI", "PID", "None"]
@@ -156,7 +220,7 @@ class GUI:
         Label(self.root, text="Mode used =", font=("Arial", 12)).grid(row=0, column=8)
 
     def create_pid_controls(self):
-        
+        # Initialize PID variables
         self.Kp_x = tk.DoubleVar(value=0.42)
         self.Ki_x = tk.DoubleVar(value=0.0005)
         self.Kd_x = tk.DoubleVar(value=1.9)
@@ -165,9 +229,9 @@ class GUI:
         self.Ki_y = tk.DoubleVar(value=0.0005)
         self.Kd_y = tk.DoubleVar(value=1.9)
 
-        self.Kp_z = tk.DoubleVar(value=0.42)
-        self.Ki_z = tk.DoubleVar(value=0.0005)
-        self.Kd_z = tk.DoubleVar(value=1.9)
+        self.Kp_z = tk.DoubleVar(value=0.12)
+        self.Ki_z = tk.DoubleVar(value=0)
+        self.Kd_z = tk.DoubleVar(value=1.2)
 
         # --- X Axis ---
         tk.Label(self.root, text="Kp-X (Proportional)").grid(row=1, column=5, padx=5, pady=5)
@@ -198,7 +262,7 @@ class GUI:
         # --- Z Axis ---
         tk.Label(self.root, text="Kp-Z (Proportional)").grid(row=5, column=5, padx=5, pady=5)
         tk.Scale(self.root, from_=0, to=2.0, resolution=0.01, orient="horizontal",
-                 variable=self.Kp_z, length=200).grid(row=6, column=5, padx=5, pady=5)  
+                 variable=self.Kp_z, length=200).grid(row=6, column=5, padx=5, pady=5)
 
         tk.Label(self.root, text="Ki-Z (Integral)").grid(row=5, column=6, padx=5, pady=5)
         tk.Scale(self.root, from_=0, to=0.01, resolution=0.0001, orient="horizontal",
@@ -209,7 +273,7 @@ class GUI:
                  variable=self.Kd_z, length=200).grid(row=6, column=7, padx=5, pady=5)
 
         # --- Max Velocity ---
-        tk.Label(self.root, text="Max velocity").grid(row=6, column=3, padx=5, pady=5)
+        tk.Label(self.root, text="Max velocity").grid(row=7, column=3, padx=5, pady=5)
         self.max_velocity = tk.DoubleVar(value=60)
         tk.Scale(self.root, from_=0, to=60, resolution=1, orient="horizontal",
                  variable=self.max_velocity, length=200).grid(row=7, column=3, columnspan=5, padx=5, pady=5)
@@ -251,14 +315,15 @@ class GUI:
             self.video_labels.append(lbl)
 
     def create_hsv_sliders(self):
-        self.h_min, self.h_max = tk.IntVar(value=35), tk.IntVar(value=85)
+
+        #self.h_min, self.h_max = tk.IntVar(value=35), tk.IntVar(value=85)
         self.s_min, self.s_max = tk.IntVar(value=55), tk.IntVar(value=255)
         self.v_min, self.v_max = tk.IntVar(value=100), tk.IntVar(value=255)
         self.t1, self.t2 = tk.IntVar(value=166), tk.IntVar(value=171)
 
         sliders_config = [
-            (self.h_min, "Hue Min:", 1),
-            (self.h_max, "Hue Max:", 2),
+            #(self.h_min, "Hue Min:", 1),
+            #(self.h_max, "Hue Max:", 2),
             (self.s_min, "Sat Min:", 3),
             (self.s_max, "Sat Max:", 4),
             (self.v_min, "Value Min:", 5),
@@ -267,9 +332,89 @@ class GUI:
             (self.t2, "Threshold2", 8)
         ]
 
+        self.hsv_widgets = []
+        self.hsv_slider_rows = []
+
+
         for var, text, row in sliders_config:
-            Scale(self.root, from_=0, to=255, orient="horizontal", variable=var, length=175).grid(row=row, column=1)
-            Label(self.root, text=text, font=("Arial", 12)).grid(row=row, column=0)
+            lbl = tk.Label(self.root, text=text, font=("Arial", 12))
+            sld = tk.Scale(self.root, from_=0, to=255, orient="horizontal",
+                           variable=var, length=175)
+
+            lbl.grid(row=row, column=0)
+            sld.grid(row=row, column=1)
+
+            self.hsv_widgets.append(lbl)
+            self.hsv_widgets.append(sld)
+            self.hsv_slider_rows.append((lbl, sld, row))
+
+
+        self.green_box = tk.Label(self.root, bg="#00FF00", width=4, height=2)
+        self.green_label = tk.Label(self.root, text="Green (Left/Right)", font=("Arial", 12))
+
+        self.blue_box = tk.Label(self.root, bg="#0000FF", width=4, height=2)
+        self.blue_label = tk.Label(self.root, text="Blue (Yaw)", font=("Arial", 12))
+
+
+        self.hsv_widgets += [
+            self.green_box, self.green_label,
+            self.blue_box, self.blue_label
+        ]
+
+        def load_img(path):
+            img = Image.open(path)
+            img = img.resize((75, 75), Image.Resampling.LANCZOS)  # redimensiona
+            return ImageTk.PhotoImage(img)
+
+        self.horse_img = load_img("Fotos/horse.png")
+        self.bird_img = load_img("Fotos/bird.png")
+        self.dog_img = load_img("Fotos/dog.png")
+        self.cat_img = load_img("Fotos/cat.png")
+
+        animal_images = [
+            self.horse_img,
+            self.bird_img,
+            self.dog_img,
+            self.cat_img
+        ]
+
+        self.game_widgets = []
+        self.game_actions = {}
+
+        actions = ["Move Up", "Move Down", "Rotate CW", "Landing"]
+        animals = ["horse", "bird", "dog", "cat"]
+
+        for i, animal in enumerate(animals):
+            frame = tk.Frame(self.root, width=80, height=80, bg="white", relief="solid", bd=2)
+            frame.grid_propagate(False)
+
+            label_img = tk.Label(frame, image=animal_images[i], bg="white")
+            label_img.pack(expand=True)
+
+            action_var = tk.StringVar(value=actions[i % len(actions)])
+            dropdown = tk.OptionMenu(self.root, action_var, *actions)
+            dropdown.config(width=7)
+
+            self.game_widgets.append((frame, dropdown))
+            self.game_actions[animal] = action_var  # <--- ASOCIA ANIMAL → ACCIÓN
+
+
+
+        self.color_game_widgets = []
+        self.color_actions = {}
+
+        colors = ["orange", "green", "blue", "purple"]
+
+        for i, color in enumerate(colors):
+            frame = tk.Frame(self.root, width=80, height=80, bg=color, relief="solid", bd=2)
+            frame.grid_propagate(False)
+
+            action_var = tk.StringVar(value=actions[i % len(actions)])
+            dropdown = tk.OptionMenu(self.root, action_var, *actions)
+            dropdown.config(width=7)
+
+            self.color_game_widgets.append((frame, dropdown))
+            self.color_actions[color] = action_var
 
     def create_velocity_display(self):
         self.lr_label = Label(self.root, text="Left-Right Velocity = 0",
@@ -287,6 +432,10 @@ class GUI:
         self.yaw_label = Label(self.root, text="Yaw Velocity = 0",
                                font=("Arial", 12), width=25, anchor='w')
         self.yaw_label.grid(row=5, column=3, padx=10, pady=10)
+
+        self.action_label = Label(self.root, text="Action:",
+                               font=("Arial", 12), width=25, anchor='w')
+        self.action_label.grid(row=6, column=3, padx=10, pady=10)
 
     def create_distance_controls(self):
         distance_methods = ["Distance by ratio", "Distance by ArUco", "Distance by pinhole", "Manual distance"]
@@ -313,7 +462,7 @@ class GUI:
         # Default values
         self.entry_height.insert(0, "27.5")
         self.entry_width.insert(0, "20.5")
-        self.entry_dist.insert(0, "70")
+        self.entry_dist.insert(0, "110")
         self.marker_length_entry.insert(0, "6")
 
         self.update_distance_fields()
@@ -353,13 +502,110 @@ class GUI:
             self.btn_maunal_distance.grid(row=4, column=8)
             self.dist_label.grid(row=5, column=8)
 
+    def update_gui_for_detection_mode(self):
+
+        for w in self.hsv_widgets:
+            w.grid_forget()
+
+        for frame, dd in self.game_widgets:
+            frame.place_forget()
+            dd.place_forget()
+
+        for frame, dd in self.color_game_widgets:
+            frame.place_forget()
+            dd.place_forget()
+
+        mode = self.detection_var.get()
+
+        if mode in ("Color Contour", "Neural Network"):
+
+            for lbl, sld, row in self.hsv_slider_rows:
+                lbl.grid(row=row, column=0)
+                sld.grid(row=row, column=1)
+
+            self.green_box.grid(row=1, column=0, sticky="e")
+            self.green_label.grid(row=1, column=1, sticky="w")
+
+            self.blue_box.grid(row=2, column=0, sticky="e")
+            self.blue_label.grid(row=2, column=1, sticky="w")
+
+            return
+
+        if mode == "Game Mode":
+
+            positions = [
+                (10, 100),  # F1
+                (95, 100),  # F2
+                (10, 220),  # F3
+                (95, 220)  # F4
+            ]
+
+            for (frame, dd), (x, y) in zip(self.game_widgets, positions):
+                frame.place(x=x, y=y)
+                dd.place(x=x, y=y + 80)
+
+            return
+
+        if mode == "Color Game Mode":
+
+            positions = [
+                (10, 100),
+                (95, 100),
+                (10, 220),
+                (95, 220)
+            ]
+
+            for (frame, dd), (x, y) in zip(self.color_game_widgets, positions):
+                frame.place(x=x, y=y)
+                dd.place(x=x, y=y + 80)
+
+            return
+
+    def reset_offsets(self):
+        self.offset_lr = 0
+        self.offset_fb = 0
+        self.offset_ud = 0
+        self.offset_yaw = 0
+        self.action_active = False
+
+    def execute_drone_action(self, action: str):
+        print(f"Action → {action}")
+        self.action_label.config(text=action)
+
+        # Evita activar varias veces la misma acción durante el tiempo de offset
+        if self.action_active:
+            self.offset_lr = 0
+            self.offset_fb = 0
+            self.offset_ud = 0
+            self.offset_yaw = 0
+        else:
+            self.action_active = True
+            self.offset_timestamp = time.time()
+
+            # Reset antes de aplicar uno nuevo
+            self.reset_offsets()
+
+            # Asignar offsets según acción
+            if action == "Move Up":
+                self.offset_ud = +40
+
+            elif action == "Move Down":
+                self.offset_ud = -40
+
+            elif action == "Rotate CW":
+                self.offset_yaw = +60
+
+            elif action == "Landing":
+                # Caso especial: bloquear PID → dejar en 0 y lanzar land
+                self.block_PID = True
+                threading.Thread(target=self.controller.me.land).start()
 
     def drone_connection(self):
         try:
             self.controller.me.connect()
+            self.controller.is_connected = True
             self.controller.me.streamoff()
             self.controller.me.streamon()
-            self.controller.is_connected = True
             print(f"Connected! Battery: {self.controller.me.get_battery()}%")
             self.connected_label.config(text="Connected", fg="green")
 
@@ -396,7 +642,6 @@ class GUI:
 
                 width, height = 640, 480
 
-                # Usamos el stream ya abierto desde drone_connection/update_frame
                 frame_read = self.controller.me.get_frame_read()
 
                 print("\nPress 'c' to capture an image, 'q' to quit.\n")
@@ -488,71 +733,103 @@ class GUI:
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def detect_objects_color_contour(self, img_dil, img_contour):
-        contours, _ = cv2.findContours(img_dil, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-        if contours:
-            c = max(contours, key=cv2.contourArea)
-            x, y, w, h = cv2.boundingRect(c)
-            cv2.rectangle(img_contour, (x, y), (x + w, y + h), (0, 255, 0), 2)
-            object_center = (x + w // 2, y + h // 2)
-            cv2.circle(img_contour, object_center, 5, (0, 0, 255), cv2.FILLED)
-            return object_center, w, h
+    def detect_objects_color_contour_dual(self, mask_green, mask_blue, img_contour):
+        kernel = np.ones((5, 5), np.uint8)
 
-        else: return None, 0, 0
+        def get_largest_contour(mask):
+            mask_clean = cv2.erode(mask, kernel, iterations=2)
+            mask_clean = cv2.dilate(mask_clean, kernel, iterations=3)
+            contours, _ = cv2.findContours(mask_clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if contours:
+                largest = max(contours, key=cv2.contourArea)
+                area = cv2.contourArea(largest)
+                if area > 1000:  # evita falsos positivos
+                    x, y, w, h = cv2.boundingRect(largest)
+                    cx, cy = x + w // 2, y + h // 2
+                    return (cx, cy, w, h, area)
+            return None
 
-    #No tira, falta de CPU o no sé el que, no sale lo de INFO, osea no llega al update frame,MIRARLO
-    def detect_objects_neural_network(self, img_contour):
-        #results = self.controller.model.track(img_contour, persist=True, conf=0.5, verbose=False)
-        results = self.controller.model.predict(img_contour, conf=0.5, verbose=False)
-        max_area = 0
-        best_box = None
+        green_info = get_largest_contour(mask_green)
+        blue_info = get_largest_contour(mask_blue)
 
-        for r in results:
-            for box in r.boxes:
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                w_box, h_box = x2 - x1, y2 - y1
-                area = w_box * h_box
-                if area > max_area:
-                    max_area = area
-                    best_box = (x1, y1, x2, y2, box)
+        if green_info and blue_info:
+            detected_color = "green" if green_info[4] >= blue_info[4] else "blue"
+            info = green_info if detected_color == "green" else blue_info
+        elif green_info:
+            detected_color = "green"
+            info = green_info
+        elif blue_info:
+            detected_color = "blue"
+            info = blue_info
+        else:
+            return None, None, None, None
 
-        if best_box is not None:
-            x1, y1, x2, y2, box = best_box
-            w, h = x2 - x1, y2 - y1
-            cx, cy = x1 + w // 2, y1 + h // 2
-            object_center = (cx, cy)
+        cx, cy, w, h, area = info
 
-            cv2.rectangle(img_contour, (x1, y1), (x2, y2), (255, 0, 0), 2)
-            cv2.putText(img_contour, f"{self.controller.model.names[int(box.cls[0])]} {float(box.conf[0]):.2f}",
-                        (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX,
-                        0.5, (255, 255, 255), 2)
-            cv2.circle(img_contour, object_center, 5, (0, 0, 255), cv2.FILLED)
-            cv2.putText(img_contour, "YOLO Detection", (10, 20),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+        color_bgr = (0, 255, 0) if detected_color == "green" else (255, 0, 0)
+        cv2.circle(img_contour, (cx, cy), 5, color_bgr, -1)
+        cv2.rectangle(img_contour, (cx - w // 2, cy - h // 2),
+                      (cx + w // 2, cy + h // 2), color_bgr, 2) #Aqui tienes los 4 vertices, comparar coordenadas con limites del frame
+        #cv2.putText(img_contour, f"{detected_color.upper()} ({w}x{h})",
+                    #(cx - 50, cy - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color_bgr, 2)
 
-            return object_center, w, h
+        return (cx, cy), w, h, detected_color
 
-        return None, 0, 0
+    def detect_objects_color_contour_dual_gamemode(self, mask_green, mask_orange, mask_blue, mask_purple, img_contour):
+        kernel = np.ones((5, 5), np.uint8)
+        def get_largest_contour(mask):
+            mask_clean = cv2.erode(mask, kernel, iterations=2) #Probar tamiben hacer lo de canny y toda la otra parte para el tema de colores
+            mask_clean = cv2.dilate(mask_clean, kernel, iterations=3)
+            contours, _ = cv2.findContours(mask_clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if contours:
+                largest = max(contours, key=cv2.contourArea)
+                area = cv2.contourArea(largest)
+                if area > 1000:  # evita falsos positivos
+                    x, y, w, h = cv2.boundingRect(largest)
+                    cx, cy = x + w // 2, y + h // 2
+                    return (cx, cy, w, h, area)
+            return None
+
+        green_info = get_largest_contour(mask_green)
+        orange_info = get_largest_contour(mask_orange)
+        blue_info = get_largest_contour(mask_blue)
+        purple_info = get_largest_contour(mask_purple)
+
+        infos = [(green_info, "green"), (orange_info, "orange"), (blue_info, "blue"), (purple_info, "purple")]
+        infos = [i for i in infos if i[0] is not None]  # eliminar None
+
+        if not infos:
+            return None, None, None, None
+
+        info, detected_color = max(infos, key=lambda x: x[0][4])
+        cx, cy, w, h, area = info
+
+        color_bgr = {
+            "green": (0, 255, 0),
+            "orange": (0, 126, 255),
+            "blue": (255, 0, 0),
+            "purple": (128, 0, 128)
+        }[detected_color]
+
+        cv2.circle(img_contour, (cx, cy), 5, color_bgr, -1)
+        cv2.rectangle(img_contour, (cx - w // 2, cy - h // 2),
+                      (cx + w // 2, cy + h // 2), color_bgr, 2)
+
+        return (cx, cy), w, h, detected_color
 
     def _yolo_worker_loop(self):
-        """Hilo que ejecuta la inferencia del modelo YOLO en segundo plano (sin reducción de resolución)."""
         while True:
-            frame = self.yolo_queue.get()  # Espera hasta tener frame
+            frame = self.yolo_queue.get()
             try:
-                if self.detection_var.get() == "Neural Network" and self.controller.model:
-                    model = self.controller.model
-                
-                elif self.detection_var.get() == "Neural Network Exterior" and self.controller.model_exterior:
-                    model = self.controller.model_exterior
+                detection_mode = self.detection_var.get()
+                if detection_mode == "Neural Network":
+                    results = self.controller.model.predict(frame, conf=0.2, verbose=False)
+                elif detection_mode == "Neural Network RC2":
+                    results = self.controller.model3.predict(frame, conf=0.2, verbose=False)
 
-                results = model.predict(frame, conf=0.2, verbose=False)
-                #results = self.controller.model.track(frame, persist=True, conf=0.4, verbose=False)
-
-                # Solo procesamos para obtener el objeto más grande y su info
-                object_center, w, h, boxes_info = self._process_yolo_result(results, model)
+                object_center, w, h, boxes_info = self._process_yolo_result(results)
 
                 with self.yolo_lock:
-                    # Guardamos también info de las boxes para que el hilo principal pueda dibujar
                     self.yolo_result = (object_center, w, h, boxes_info)
 
             except Exception as e:
@@ -560,8 +837,7 @@ class GUI:
                 with self.yolo_lock:
                     self.yolo_result = (None, 0, 0, [])
 
-    def _process_yolo_result(self, results, model):
-        """Procesa las detecciones YOLO y devuelve información para dibujar."""
+    def _process_yolo_result(self, results):
         object_center = None
         w = h = 0
         max_area = 0
@@ -573,8 +849,13 @@ class GUI:
                 w_box, h_box = x2 - x1, y2 - y1
                 area = w_box * h_box
                 conf = float(box.conf[0])
-                label = model.names[int(box.cls[0])] \
-                    if hasattr(model, "names") else str(int(box.cls[0]))
+                detection_mode = self.detection_var.get()
+                if detection_mode == "Neural Network":
+                    label = self.controller.model.names[int(box.cls[0])] \
+                        if hasattr(self.controller.model, "names") else str(int(box.cls[0]))
+                elif detection_mode == "Neural Network RC2":
+                    label = self.controller.model3.names[int(box.cls[0])] \
+                        if hasattr(self.controller.model3, "names") else str(int(box.cls[0]))
 
                 boxes_info.append((x1, y1, x2, y2, label, conf))
 
@@ -585,49 +866,12 @@ class GUI:
 
         return object_center, int(w), int(h), boxes_info
 
-    def detect_object_neural_network_game(self, img_contour):
-        results = self.controller.model2.track(img_contour, persist=True, conf=0.5, verbose=False)
-        max_area = 0
-        best_box = None
-        detected_label = None
-
-        for r in results:
-            for box in r.boxes:
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                w_box, h_box = x2 - x1, y2 - y1
-                area = w_box * h_box
-                if area > max_area:
-                    max_area = area
-                    best_box = (x1, y1, x2, y2, box)
-                    detected_label = int(box.cls[0])
-
-        if best_box is not None:
-            x1, y1, x2, y2, box = best_box
-            w, h = x2 - x1, y2 - y1
-            cx, cy = x1 + w // 2, y1 + h // 2
-            object_center = (cx, cy)
-
-            label_name = "horse" if detected_label == 0 else "bird"
-            cv2.rectangle(img_contour, (x1, y1), (x2, y2), (0, 255, 255), 2)
-            cv2.putText(img_contour, f"{label_name.upper()} {float(box.conf[0]):.2f}",
-                        (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX,
-                        0.5, (255, 255, 255), 2)
-            cv2.circle(img_contour, object_center, 5, (255, 0, 0), cv2.FILLED)
-            cv2.putText(img_contour, "GAME MODE", (10, 20),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
-
-            return object_center, w, h, label_name
-
-        return None, 0, 0, None
-
     def _game_worker_loop(self):
-        """Hilo que ejecuta el modelo2.track() (modo juego) en segundo plano (sin dibujo)."""
         while True:
             frame = self.game_queue.get()
             try:
                 #results = self.controller.model2.track(frame, persist=True, conf=0.5, verbose=False)
                 results = self.controller.model2.predict(frame, conf=0.5, verbose=False)
-                # Procesar resultados para obtener info de las detecciones
                 object_center, w, h, label_name, boxes_info = self._process_game_result(results)
 
                 with self.game_lock:
@@ -638,7 +882,6 @@ class GUI:
                     self.game_result = (None, 0, 0, None, [])
 
     def _process_game_result(self, results):
-        """Procesa las detecciones del modo juego y devuelve datos y boxes para dibujar."""
         max_area = 0
         best_box = None
         detected_label = None
@@ -651,7 +894,8 @@ class GUI:
                 area = w_box * h_box
                 conf = float(box.conf[0])
                 cls_id = int(box.cls[0])
-                label_name = "horse" if cls_id == 0 else "bird"
+                label_map = {0: "horse", 1: "bird", 2: "dog", 3: "cat"}
+                label_name = label_map.get(cls_id, "unknown")
                 boxes_info.append((x1, y1, x2, y2, label_name, conf))
 
                 if area > max_area:
@@ -734,6 +978,8 @@ class GUI:
             self.dist_label.config(text="[Pinhole] No object detected")
             return None
 
+
+    #El error es demasiado pequeño, para este metodo habría que subir los kp,i,d o hacer el error más grande multiplicando por 100 por ejemplo
     def distance_by_hand(self, w ,h):
         if w and h and self.w_det and self.h_det:
             area = w * h
@@ -747,8 +993,46 @@ class GUI:
         else:
             return None
 
-    def update_frame(self):
+    def check_distance_safety(self, cx, cy, w, h, distance):
+        if cx is None or cy is None or w is None or h is None or distance is None:
+            return True
+        margin_x = int(self.panel_width * 0.05)
+        margin_y = int(self.panel_height * 0.05)
+        x1 = cx - w // 2
+        x2 = cx + w // 2
+        y1 = cy - h // 2
+        y2 = cy + h // 2
+        object_clipped = (x1 <= margin_x or y1 <= margin_y or x2 >= self.panel_width - margin_x or
+                y2 >= self.panel_height - margin_y)
+        if object_clipped:
+            return True
 
+        mode = self.opt_dist_method.get()
+        if mode != "Manual distance":
+            max_delta = 20  # Salto de 20 cm en menos de 30 ms peligroso
+            if not hasattr(self, "last_valid_distance") or self.last_valid_distance is None:
+                self.last_valid_distance = distance
+                return False
+
+            distance_jump = abs(distance - self.last_valid_distance) > max_delta
+
+            if distance_jump:
+                return True
+
+            self.last_valid_distance = distance
+            return False
+
+    def update_yaw(self, yaw_velocity, dt):
+        # yaw_velocity viene en grados/seg
+        self.yaw_deg += yaw_velocity * dt
+        self.yaw_deg %= 360
+        return self.yaw_deg
+
+    def update_frame(self):
+        mode = self.detection_var.get()
+        if mode != self.last_detection_mode:
+            self.update_gui_for_detection_mode()
+            self.last_detection_mode = mode
         if self.controller.is_connected:
             self.battery_label.config(text=f"Battery: {self.controller.me.get_battery()}%", fg="blue")
             frame_read = self.controller.me.get_frame_read()
@@ -758,48 +1042,47 @@ class GUI:
             img_contour = img_display.copy()
             img_hsv = cv2.cvtColor(img_display, cv2.COLOR_BGR2HSV)
 
-            lower = np.array([self.h_min.get(), self.s_min.get(), self.v_min.get()])
-            upper = np.array([self.h_max.get(), self.s_max.get(), self.v_max.get()])
-            mask = cv2.inRange(img_hsv, lower, upper)
-            result = cv2.bitwise_and(img_display, img_display, mask=mask)
-
-            img_blur = cv2.GaussianBlur(result, (7, 7), 1)
-            img_gray = cv2.cvtColor(img_blur, cv2.COLOR_BGR2GRAY)
-            img_canny = cv2.Canny(img_gray, self.t1.get(), self.t2.get())
-            kernel = np.ones((5, 5), np.uint8)
-            img_dil = cv2.dilate(img_canny, kernel, iterations=1)
-
             object_center = None
             distance = None
             w, h = None, None
+            detected_color = None
             detection_mode = self.detection_var.get()
 
-
             if detection_mode == "Color Contour":
-                object_center, w, h = self.detect_objects_color_contour(img_dil, img_contour)
+                self.opt_cam.set("Drone Camera")
+                lower_green = np.array([self.hsv_green_min, self.s_min.get(), self.v_min.get()])
+                upper_green = np.array([self.hsv_green_max, self.s_max.get(), self.v_max.get()])
+                mask_green = cv2.inRange(img_hsv, lower_green, upper_green)
 
-            elif detection_mode == "Neural Network" and self.controller.model:
+                lower_blue = np.array([self.hsv_blue_min, 73, 23])
+                upper_blue = np.array([self.hsv_blue_max, self.s_max.get(), self.v_max.get()])
+                mask_blue = cv2.inRange(img_hsv, lower_blue, upper_blue)
+
+                # Combinar resultados (solo uno se usará tras comparar áreas)
+                mask_combined = cv2.bitwise_or(mask_green, mask_blue)
+                result = cv2.bitwise_and(img_display, img_display, mask=mask_combined)
+
+                img_blur = cv2.GaussianBlur(result, (7, 7), 1)
+                img_gray = cv2.cvtColor(img_blur, cv2.COLOR_BGR2GRAY)
+                img_canny = cv2.Canny(img_gray, self.t1.get(), self.t2.get())
+                kernel = np.ones((5, 5), np.uint8)
+                img_dil = cv2.dilate(img_canny, kernel, iterations=1)
+
+                #detectar contornos y determinar color dominante
+                object_center, w, h, detected_color = self.detect_objects_color_contour_dual(mask_green, mask_blue,
+                                                                                             img_contour)
+
+            elif (detection_mode == "Neural Network" or detection_mode=="Neural Network RC2") and self.controller.model is not None and self.controller.model3 is not None:
+                self.opt_cam.set("Mirror")
+
                 try:
+                    #.put_nowait lo que hace en la cola de un frame es:
+                    #Si esta cola está vacia entonces añadiremos a la cola el último frame y como el bucle de yolo_worker no para procesaremos esa imagen
                     self.yolo_queue.put_nowait(img_contour.copy())
+                    print("Usando ultimo frame")
                 except queue.Full:
-                    pass
-
-                with self.yolo_lock:
-                    object_center, w, h, boxes_info = self.yolo_result
-
-                if boxes_info:
-                    for (x1, y1, x2, y2, label, conf) in boxes_info:
-                        cv2.rectangle(img_contour, (x1, y1), (x2, y2), (255, 0, 0), 2)
-                        cv2.putText(img_contour, f"{label} {conf:.2f}",
-                                    (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX,
-                                    0.7, (255, 255, 255), 2)
-                        
-            elif detection_mode == "Neural Network Exterior" and self.controller.model_exterior:
-                try:
-                    self.yolo_queue.put_nowait(img_contour.copy())
-                except queue.Full:
-                    pass
-
+                    pass #Si la cola está llena es porque el anterior frame todavía no se ha procesado ya que .predict tarda mucho en ejecutarse, entonces ignoraremos el nuevo frame y seguiremos trabajando con el anterior resultado/frame el cual ya estaba procesado
+                    print("YOLO ocupado: usando frame anterior")
                 with self.yolo_lock:
                     object_center, w, h, boxes_info = self.yolo_result
 
@@ -811,6 +1094,8 @@ class GUI:
                                     0.7, (255, 255, 255), 2)
 
             elif detection_mode == "Game Mode" and self.controller.model2 is not None:
+                self.opt_cam.set("Mirror")
+                self.block_PID = False
                 try:
                     self.game_queue.put_nowait(img_contour.copy())
                 except queue.Full:
@@ -819,39 +1104,71 @@ class GUI:
                 with self.game_lock:
                     object_center, w, h, detected_label, boxes_info = self.game_result
 
-
                 if boxes_info:
-
                     largest_box = max(
                         boxes_info,
                         key=lambda b: (b[2] - b[0]) * (b[3] - b[1])
                     )
                     x1, y1, x2, y2, label_name, conf = largest_box
-
-
                     cv2.rectangle(img_contour, (x1, y1), (x2, y2), (255, 0, 0), 2)
                     cv2.putText(img_contour, f"{label_name.upper()} {conf:.2f}",
                                 (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX,
                                 0.7, (255, 255, 255), 2)
-
-
                     detected_label = label_name
                 else:
                     detected_label = None
 
-                if detected_label is not None:
-                    if detected_label != self.last_detected_label:
-                        if detected_label == "horse":
-                            print("Detected HORSE → Drone UP 20 cm")
-                            if self.simulation_var.get() == "False":
-                                self.controller.me.move_up(20)
-                        elif detected_label == "bird":
-                            print("Detected BIRD → Drone DOWN 20 cm")
-                            if self.simulation_var.get() == "False":
-                                self.controller.me.move_down(20)
+                if detected_label is not None and detected_label != self.action_done_for_label:
+                    if self.detection_var.get() == "Game Mode":
+                        if detected_label in self.game_actions:
+                            action = self.game_actions[detected_label].get()
+                            self.execute_drone_action(action)
 
-                        self.last_detected_label = detected_label
-                        self.action_done_for_label = detected_label
+
+                    self.action_done_for_label = detected_label
+
+            elif detection_mode == "Color Game Mode":
+                self.opt_cam.set("Mirror")
+                self.block_PID = False
+                lower_orange = np.array([85, self.s_min.get(), self.v_min.get()])
+                upper_orange = np.array([125, self.s_max.get(), self.v_max.get()])
+                mask_orange = cv2.inRange(img_hsv, lower_orange, upper_orange)
+
+                lower_green = np.array([self.hsv_green_min, self.s_min.get(), self.v_min.get()])
+                upper_green = np.array([self.hsv_green_max, self.s_max.get(), self.v_max.get()])
+                mask_green = cv2.inRange(img_hsv, lower_green, upper_green)
+
+                lower_blue = np.array([self.hsv_blue_min, 73, 23])
+                upper_blue = np.array([self.hsv_blue_max, self.s_max.get(), self.v_max.get()])
+                mask_blue = cv2.inRange(img_hsv, lower_blue, upper_blue)
+
+                lower_purple = np.array([0, 40, self.v_min.get()])
+                upper_purple = np.array([10, self.s_max.get(), self.v_max.get()])
+                mask_purple = cv2.inRange(img_hsv, lower_purple, upper_purple)
+
+                mask_combined = cv2.bitwise_or(mask_orange, mask_green)
+                mask_combined = cv2.bitwise_or(mask_combined, mask_blue)
+                mask_combined = cv2.bitwise_or(mask_combined, mask_purple)
+                result = cv2.bitwise_and(img_display, img_display, mask=mask_combined)
+
+                img_blur = cv2.GaussianBlur(result, (7, 7), 1)
+                img_gray = cv2.cvtColor(img_blur, cv2.COLOR_BGR2GRAY)
+                img_canny = cv2.Canny(img_gray, self.t1.get(), self.t2.get())
+                kernel = np.ones((5, 5), np.uint8)
+                img_dil = cv2.dilate(img_canny, kernel, iterations=1)
+
+                object_center, w, h, detected_color = self.detect_objects_color_contour_dual_gamemode(
+                    mask_green, mask_orange, mask_blue, mask_purple, img_contour)
+                if detected_color is not None and detected_color != self.action_done_for_label:
+                    #Si hay un cambio de color quizas deberiamos de meter una espera de tiempo porque entre el cambio de color
+                    #el area se modifica y esto puede provar cambios de velocidad for_back drásticos
+                    if self.detection_var.get() == "Color Game Mode":
+                        if detected_color in self.color_actions:
+                            action = self.color_actions[detected_color].get()
+                            self.execute_drone_action(action)
+
+                    self.action_done_for_label = detected_color
+
             else:
                 cv2.putText(img_contour, "No detection mode active", (10, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
@@ -859,25 +1176,18 @@ class GUI:
             self.latest_w = w
             self.latest_h = h
 
-
             img_highres = cv2.resize(my_frame, (640, 480))
             gray_highres = cv2.cvtColor(img_highres, cv2.COLOR_BGR2GRAY)
-
             mode = self.opt_dist_method.get()
-
             camera_matrix = self.camera_matrix
             dist_coeffs = self.dist_coeffs
 
-
             if mode == "Distance by ratio" and object_center is not None:
                 distance = self.distance_by_ratio(img_display, object_center, w, h)
-
             elif mode == "Distance by ArUco":
                 distance = self.distance_by_aruco(gray_highres, img_contour, camera_matrix, dist_coeffs)
-
             elif mode == "Distance by pinhole":
                 distance = self.distance_by_pinhole(camera_matrix, w, h)
-
             elif mode == "Manual distance":
                 distance = self.distance_by_hand(w, h)
             else:
@@ -886,25 +1196,26 @@ class GUI:
             if object_center and distance is not None:
                 cx, cy = object_center
                 cv2.line(img_contour, (int(self.panel_width / 2), int(self.panel_height / 2)), (cx, cy), (0, 0, 255), 3)
-                desired_distance = float(self.entry_dist.get()) if self.entry_dist.get() else 70
+                desired_distance = float(self.entry_dist.get()) if self.entry_dist.get() else 110
 
                 error_x = cx - (self.panel_width / 2)
                 if self.opt_cam.get() == "Drone Camera":
                     error_y = (self.panel_height / 2) - cy
-
                 else:
                     error_y = cy - (self.panel_height / 2)
 
+                unsafe = self.check_distance_safety(cx, cy, w, h, distance)
 
-                if mode == "Distance by ratio":
-                    e_max = (self.panel_width / 2 + self.panel_height / 2) / 2
-                    error_z = e_max / desired_distance * distance - e_max
-
-                elif mode == "Manual distance":
-                    error_z = distance if distance else 0
-
+                if unsafe:
+                    error_z = 0
                 else:
-                    error_z = distance - desired_distance
+                    if mode == "Distance by ratio":
+                        e_max = (self.panel_width / 2 + self.panel_height / 2) / 2
+                        error_z = e_max / desired_distance * distance - e_max
+                    elif mode == "Manual distance":
+                        error_z = distance if distance else 0
+                    else:
+                        error_z = distance - desired_distance
 
                 self.controller.integral_x += error_x
                 derivative_x = error_x - self.controller.prev_error_x
@@ -913,15 +1224,41 @@ class GUI:
                 self.controller.integral_z += error_z
                 derivative_z = error_z - self.controller.prev_error_z
 
+                if self.opt_cam.get() == "Mirror":
+                    self.Kp_x.set(0.20)
+                    self.Ki_x.set(0.0003)
+                    self.Kd_x.set(1.2)
+                    self.Kp_y.set(0.20)
+                    self.Ki_y.set(0.0003)
+                    self.Kd_y.set(1.2)
+                    self.Kp_z.set(0)
+                    self.Ki_z.set(0)
+                    self.Kd_z.set(0)
+                else:
+                    self.Kp_x.set(0.42)
+                    self.Ki_x.set(0.0005)
+                    self.Kd_x.set(1.9)
+                    self.Kp_y.set(0.42)
+                    self.Ki_y.set(0.0005)
+                    self.Kd_y.set(1.9)
+                    if self.opt_dist_method.get() == "Manual distance":
+                        self.Kp_z.set(0.4)
+                        self.Ki_z.set(0)
+                        self.Kd_z.set(2)
+                    else:
+                        self.Kp_z.set(0.12)
+                        self.Ki_z.set(0)
+                        self.Kd_z.set(1.2)
+
                 Kpx, Kix, Kdx = self.Kp_x.get(), self.Ki_x.get(), self.Kd_x.get()
                 Kpy, Kiy, Kdy = self.Kp_y.get(), self.Ki_y.get(), self.Kd_y.get()
                 Kpz, Kiz, Kdz = self.Kp_z.get(), self.Ki_z.get(), self.Kd_z.get()
 
-                if self.opt.get() == "P":
+                if self.opt.get()=="P":
                     speed_x = int(Kpx * error_x)
                     speed_y = int(Kpy * error_y)
                     speed_z = int(Kpz * error_z)
-                elif self.opt.get() == "I":
+                elif self.opt.get()=="I":
                     speed_x = int(Kix * self.controller.integral_x)
                     speed_y = int(Kiy * self.controller.integral_y)
                     speed_z = int(Kiz * self.controller.integral_z)
@@ -929,59 +1266,161 @@ class GUI:
                     speed_x = int(Kdx * derivative_x)
                     speed_y = int(Kdy * derivative_y)
                     speed_z = int(Kdz * derivative_z)
-                elif self.opt.get() == "PID":
-                    speed_x = int(Kpx * error_x + Kix * self.controller.integral_x + Kdx * derivative_x)
-                    speed_y = int(Kpy * error_y + Kiy * self.controller.integral_y + Kdy * derivative_y)
-                    speed_z = int(Kpz * error_z + Kiz * self.controller.integral_z + Kdz * derivative_z)
-                elif self.opt.get() == "PD":
-                    speed_x = int(Kpx * error_x + Kdx * derivative_x)
-                    speed_y = int(Kpy * error_y + Kdy * derivative_y)
-                    speed_z = int(Kpz * error_z + Kdz * derivative_z)
                 elif self.opt.get() == "PI":
                     speed_x = int(Kpx * error_x + Kix * self.controller.integral_x)
                     speed_y = int(Kpy * error_y + Kiy * self.controller.integral_y)
                     speed_z = int(Kpz * error_z + Kiz * self.controller.integral_z)
+                elif self.opt.get() == "PD":
+                    speed_x = int(Kpx * error_x + Kdx * derivative_x)
+                    speed_y = int(Kpy * error_y + Kdy * derivative_y)
+                    speed_z = int(Kpz * error_z + Kdz * derivative_z)
+                elif self.opt.get() == "PID":
+                    speed_x = int(Kpx * error_x + Kix * self.controller.integral_x + Kdx * derivative_x)
+                    speed_y = int(Kpy * error_y + Kiy * self.controller.integral_y + Kdy * derivative_y)
+                    speed_z = int(Kpz * error_z + Kiz * self.controller.integral_z + Kdz * derivative_z)
                 else:
-                    speed_x, speed_y, speed_z = error_x, error_y, error_z
+                    speed_x = 0
+                    speed_y = 0
+                    speed_z = 0
+
 
                 self.controller.me.left_right_velocity = 0
                 self.controller.me.for_back_velocity = 0
                 self.controller.me.up_down_velocity = 0
                 self.controller.me.yaw_velocity = 0
-                if self.opt_cam.get() == "Drone Camera":
-                    self.controller.me.yaw_velocity = int(np.clip(speed_x, -self.max_velocity.get(), self.max_velocity.get()))
-                    self.controller.me.up_down_velocity = int(np.clip(speed_y, -self.max_velocity.get(), self.max_velocity.get()))
-                    self.controller.me.for_back_velocity = int(np.clip(speed_z, -self.max_velocity.get(), self.max_velocity.get()))
+
+                if self.opt_cam.get() == "Drone Camera" and detection_mode == "Color Contour":
+                    if detected_color == "green":
+                        self.Kp_x.set(0.36)
+                        self.Ki_x.set(0.0003)
+                        self.Kd_x.set(2.8)
+                        Kpx, Kix, Kdx = self.Kp_x.get(), self.Ki_x.get(), self.Kd_x.get()
+                        if self.opt.get() == "P":
+                            speed_x = int(Kpx * error_x)
+                        elif self.opt.get() == "I":
+                            speed_x = int(Kix * self.controller.integral_x)
+                        elif self.opt.get() == "D":
+                            speed_x = int(Kdx * derivative_x)
+                        elif self.opt.get() == "PI":
+                            speed_x = int(Kpx * error_x + Kix * self.controller.integral_x)
+                        elif self.opt.get() == "PD":
+                            speed_x = int(Kpx * error_x + Kdx * derivative_x)
+                        elif self.opt.get() == "PID":
+                            speed_x = int(Kpx * error_x + Kix * self.controller.integral_x + Kdx * derivative_x)
+                        else:
+                            speed_x = 0
+                        self.controller.me.left_right_velocity = np.clip(speed_x, -self.max_velocity.get(), self.max_velocity.get())
+                        self.controller.me.yaw_velocity = 0
+                    elif detected_color == "blue":
+                        self.Kp_x.set(0.42)
+                        self.Ki_x.set(0.0005)
+                        self.Kd_x.set(1.9)
+                        Kpx, Kix, Kdx = self.Kp_x.get(), self.Ki_x.get(), self.Kd_x.get()
+                        if self.opt.get() == "P":
+                            speed_x = int(Kpx * error_x)
+                        elif self.opt.get() == "I":
+                            speed_x = int(Kix * self.controller.integral_x)
+                        elif self.opt.get() == "D":
+                            speed_x = int(Kdx * derivative_x)
+                        elif self.opt.get() == "PI":
+                            speed_x = int(Kpx * error_x + Kix * self.controller.integral_x)
+                        elif self.opt.get() == "PD":
+                            speed_x = int(Kpx * error_x + Kdx * derivative_x)
+                        elif self.opt.get() == "PID":
+                            speed_x = int(Kpx * error_x + Kix * self.controller.integral_x + Kdx * derivative_x)
+                        else:
+                            speed_x = 0
+                        self.controller.me.yaw_velocity = np.clip(speed_x, -self.max_velocity.get(), self.max_velocity.get())
+                        self.controller.me.left_right_velocity = 0
+
+                    self.controller.me.up_down_velocity = np.clip(speed_y, -self.max_velocity.get(), self.max_velocity.get())
+                    self.controller.me.for_back_velocity = np.clip(speed_z, -self.max_velocity.get(), self.max_velocity.get())
                 else:
-                    self.controller.me.left_right_velocity = int(np.clip(speed_x, -self.max_velocity.get(), self.max_velocity.get()))
-                    self.controller.me.for_back_velocity = int(np.clip(speed_y, -self.max_velocity.get(), self.max_velocity.get()))
-                    self.controller.me.up_down_velocity = 0
+                    if self.opt_cam.get() == "Drone Camera":
+                        self.controller.me.yaw_velocity = np.clip(speed_x, -self.max_velocity.get(), self.max_velocity.get())
+                        self.controller.me.up_down_velocity = np.clip(speed_y, -self.max_velocity.get(), self.max_velocity.get())
+                        self.controller.me.for_back_velocity = np.clip(speed_z, -self.max_velocity.get(), self.max_velocity.get())
+                        self.controller.me.left_right_velocity = 0
+                    else:
+                        self.controller.me.left_right_velocity = np.clip(speed_x, -self.max_velocity.get(), self.max_velocity.get())
+                        self.controller.me.for_back_velocity = np.clip(speed_y, -self.max_velocity.get(), self.max_velocity.get())
+                        self.controller.me.up_down_velocity = 0
+                        self.controller.me.yaw_velocity = 0
 
 
                 self.controller.prev_error_x, self.controller.prev_error_y, self.controller.prev_error_z = error_x, error_y, error_z
+                self.lr_label.config(text=f"Left-Right Velocity = {self.controller.me.left_right_velocity}")
+                self.fb_label.config(text=f"For-Back Velocity = {self.controller.me.for_back_velocity}")
+                self.ud_label.config(text=f"Up-Down Velocity = {self.controller.me.up_down_velocity}")
+                self.yaw_label.config(text=f"Yaw Velocity = {self.controller.me.yaw_velocity}")
 
                 if self.simulation_var.get() == "True":
+                    self.controller.me.left_right_velocity = 0
+                    self.controller.me.for_back_velocity = 0
+                    self.controller.me.up_down_velocity = 0
+                    self.controller.me.yaw_velocity = 0
                     self.controller.me.send_rc_control(0, 0, 0, 0)
+                    #Para que no se acumulen los errores al quitar el modo simulación:
+                    self.controller.integral_x = 0
+                    self.controller.integral_y = 0
+                    self.controller.integral_z = 0
+                    self.controller.prev_error_x = 0
+                    self.controller.prev_error_y = 0
+                    self.controller.prev_error_z = 0
+                    #print("Estamos en modo simulacion")
+                elif self.simulation_var.get() == "False" and self.block_PID == False:
+
+                    if (time.time() - self.offset_timestamp) * 1000 > self.offset_duration_ms:
+                        self.reset_offsets()
+
+                    # Velocidades PID
+                    lr = int(self.controller.me.left_right_velocity)
+                    fb = int(self.controller.me.for_back_velocity)
+                    ud = int(self.controller.me.up_down_velocity)
+                    yaw = int(self.controller.me.yaw_velocity)
+
+                    # Sumar offsets
+                    lr += self.offset_lr
+                    fb += self.offset_fb
+                    ud += self.offset_ud
+                    yaw += self.offset_yaw
+
+                    # Clampear
+                    max_v = self.max_velocity.get()
+                    lr = np.clip(lr, -max_v, max_v)
+                    fb = np.clip(fb, -max_v, max_v)
+                    ud = np.clip(ud, -max_v, max_v)
+                    yaw = np.clip(yaw, -max_v, max_v)
+
+                    # Enviar control
+                    self.controller.me.send_rc_control(int(lr), int(fb), int(ud), int(yaw))
+
+                    self.lr_label.config(text=f"Left-Right Velocity = {self.controller.me.left_right_velocity}")
+                    self.fb_label.config(text=f"For-Back Velocity = {self.controller.me.for_back_velocity}")
+                    self.ud_label.config(text=f"Up-Down Velocity = {self.controller.me.up_down_velocity}")
+                    self.yaw_label.config(text=f"Yaw Velocity = {self.controller.me.yaw_velocity}")
+
                 else:
-                    self.controller.me.send_rc_control(self.controller.me.left_right_velocity,
-                                                       self.controller.me.for_back_velocity,
-                                                       self.controller.me.up_down_velocity,
-                                                       self.controller.me.yaw_velocity)
-
-                if self.opt_cam.get() == "Drone Camera":
-                    self.lr_label.config(text=f"Left-Right Velocity = {0}")
-                    self.fb_label.config(text=f"For-Back Velocity = {speed_z}")
-                    self.ud_label.config(text=f"Up-Down Velocity = {speed_y}")
-                    self.yaw_label.config(text=f"Yaw Velocity = {speed_x}")
-                else:
-                    self.lr_label.config(text=f"Left-Right Velocity = {speed_x}")
-                    self.fb_label.config(text=f"For-Back Velocity = {speed_y}")
-                    self.ud_label.config(text=f"Up-Down Velocity = {0}")
-                    self.yaw_label.config(text=f"Yaw Velocity = {0}")
+                    self.controller.me.send_rc_control(0, 0, 0, 0)
 
 
+            else:
+                self.controller.me.left_right_velocity = 0
+                self.controller.me.for_back_velocity = 0
+                self.controller.me.up_down_velocity = 0
+                self.controller.me.yaw_velocity = 0
+                self.controller.integral_x = 0
+                self.controller.integral_y = 0
+                self.controller.integral_z = 0
+                self.controller.prev_error_x = 0
+                self.controller.prev_error_y = 0
+                self.controller.prev_error_z = 0
+                self.controller.me.send_rc_control(0, 0, 0, 0)
+                # Para que no se acumulen los errores al quitar el modo simulación:
 
-            frames_to_show = [img_dil, img_contour]
+
+            #frames_to_show = [img_dil if detection_mode == "Color Contour" else img_display, img_contour]
+            frames_to_show = [img_display, img_contour]
             for labels, f in zip(self.video_labels, frames_to_show):
                 if len(f.shape) == 2:
                     f = cv2.cvtColor(f, cv2.COLOR_GRAY2RGB)
@@ -991,10 +1430,15 @@ class GUI:
                 labels.imgtk = imgtk
                 labels.config(image=imgtk)
 
-        detection_mode = self.detection_var.get()
-        if detection_mode == "Color Contour":
-            self.root.after(30, self.update_frame)
-        else:
-            self.root.after(30, self.update_frame)
+
+
+            now = time.time()
+            dt = now - self.last_position_time
+            self.last_position_time = now
+            yaw_deg = self.update_yaw(self.controller.me.yaw_velocity,dt)
+            self.tracker.update_with_velocities(self.controller.me.left_right_velocity,self.controller.me.for_back_velocity,yaw_deg,dt,plot=True)
+
+        self.root.after(30, self.update_frame)
+
 
 

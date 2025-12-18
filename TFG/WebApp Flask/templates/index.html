@@ -4,6 +4,7 @@
     <title>Transmisor o Receptor</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+
     <style>
         html, body {
             margin: 0;
@@ -40,7 +41,6 @@
             box-shadow: 0px 4px 6px rgba(0,0,0,0.2);
         }
 
-        /* Receptor pantalla completa */
         #receiver {
             position: fixed;
             top: 0;
@@ -48,20 +48,18 @@
             width: 100%;
             height: 100%;
             background: black;
-            display: none; /* oculto por defecto */
+            display: none;
             align-items: center;
             justify-content: center;
             overflow: hidden;
         }
 
-        /* Imagen a pantalla completa, adaptada perfectamente */
         #receiver img {
             width: 100%;
             height: 100%;
-            object-fit: contain; /* mantiene proporciones sin recortar */
+            object-fit: contain;
         }
 
-        /* Si el móvil está en horizontal, usa cover para llenar */
         @media (orientation: landscape) {
             #receiver img {
                 object-fit: cover;
@@ -69,6 +67,7 @@
         }
     </style>
 </head>
+
 <body>
     <h1>Selecciona tu rol:</h1>
     <button onclick="chooseRole('transmitter')">Soy Transmisor</button>
@@ -78,10 +77,23 @@
 
     <div id="images" style="display:none;">
         <h2>Selecciona una imagen:</h2>
-        <img src="https://2.bp.blogspot.com/-fOKnfX3wl_4/WfEkY9coU3I/AAAAAAAAA6Q/O1huB_NomcgBt9XdMnJ3nj_lgv7_5ja7ACLcBGAs/s1600/color+rojo.jpg" onclick="sendImage('rojo')">
-        <img src="https://cdn.shopify.com/s/files/1/1088/9628/products/Verde_be86844b-a2bb-48cd-bfe2-4e8a6c613132_grande.jpg" onclick="sendImage('verde')">
-        <img src="https://upload.wikimedia.org/wikipedia/commons/3/32/House_sparrow04.jpg" onclick="sendImage('pajaro')">
-        <img src="https://thypix.com/wp-content/uploads/horse-113.jpg" onclick="sendImage('caballo')">
+
+        <img src="/fotos/Verde1.jpg" onclick="sendImage('Verde1.jpg')">
+        <img src="/fotos/Naranja1.jpg" onclick="sendImage('Naranja1.jpg')">
+        <img src="/fotos/Azul1.jpg" onclick="sendImage('Azul1.jpg')">
+        <img src="/fotos/Lila1.jpg" onclick="sendImage('Lila1.jpg')">
+
+        <img src="/fotos/Perro1.jpg" onclick="sendImage('Perro1.jpg')">
+        <img src="/fotos/Gato1.jpg" onclick="sendImage('Gato1.jpg')">
+        <img src="/fotos/Pajaro1.jpg" onclick="sendImage('Pajaro1.jpg')">
+        <img src="/fotos/Caballo1.jpg" onclick="sendImage('Caballo1.jpg')">
+
+        <img src="/fotos/OtroPerro.jpg" onclick="sendImage('OtroPerro.jpg')">
+        <img src="/fotos/OtroGato.jpg" onclick="sendImage('OtroGato.jpg')">
+        <img src="/fotos/OtroPajaro.jpg" onclick="sendImage('OtroPajaro.jpg')">
+        <img src="/fotos/OtroCaballo.jpg" onclick="sendImage('OtroCaballo.jpg')">
+
+
     </div>
 
     <div id="receiver"></div>
@@ -99,56 +111,32 @@
             socket.emit('send_image', {image: img});
         }
 
-        socket.on('waiting', function(data) {
+        socket.on('waiting', data => {
             document.getElementById("status").innerHTML = data.msg;
         });
 
-        socket.on('ready', function(data) {
+        socket.on('ready', data => {
             document.getElementById("status").innerHTML = data.msg;
             if (role === "transmitter") {
                 document.getElementById("images").style.display = "block";
             }
         });
 
-        socket.on('show_image', function(data) {
+        socket.on('show_image', data => {
             const receiver = document.getElementById("receiver");
-            let html = "";
-            if (data.image === "rojo") {
-                html = '<img src="https://2.bp.blogspot.com/-fOKnfX3wl_4/WfEkY9coU3I/AAAAAAAAA6Q/O1huB_NomcgBt9XdMnJ3nj_lgv7_5ja7ACLcBGAs/s1600/color+rojo.jpg">';
-            } else if (data.image === "verde") {
-                html = '<img src="https://cdn.shopify.com/s/files/1/1088/9628/products/Verde_be86844b-a2bb-48cd-bfe2-4e8a6c613132_grande.jpg">';
-            } else if (data.image === "pajaro") {
-                html = '<img src="https://upload.wikimedia.org/wikipedia/commons/3/32/House_sparrow04.jpg">';
-            } else if (data.image === "caballo") {
-                html = '<img src="https://thypix.com/wp-content/uploads/horse-113.jpg">';
-            }
-
-            receiver.innerHTML = html;
-            receiver.style.display = "flex"; // mostrar solo cuando haya imagen
-
-            // Forzar modo pantalla completa si el receptor está en móvil
+            let imgPath = "/fotos/" + data.image;
+            receiver.innerHTML = `<img src="${imgPath}">`;
+            receiver.style.display = "flex";
             openFullScreen(receiver);
         });
 
-        // Limpieza (opcional)
-        socket.on('clear_image', function() {
-            const receiver = document.getElementById("receiver");
-            receiver.innerHTML = "";
-            receiver.style.display = "none";
-        });
-
-        // Función para entrar en pantalla completa en móvil
         function openFullScreen(elem) {
-            if (elem.requestFullscreen) {
-                elem.requestFullscreen();
-            } else if (elem.webkitRequestFullscreen) {
-                elem.webkitRequestFullscreen();
-            } else if (elem.msRequestFullscreen) {
-                elem.msRequestFullscreen();
-            }
+            if (elem.requestFullscreen) elem.requestFullscreen();
+            else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+            else if (elem.msRequestFullscreen) elem.msRequestFullscreen();
         }
     </script>
+
 </body>
 </html>
-
 
