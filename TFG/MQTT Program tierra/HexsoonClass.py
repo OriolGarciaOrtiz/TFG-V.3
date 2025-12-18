@@ -76,6 +76,18 @@ class HexsoonController:
         self.original_frame_RTC = None
         self.detected_frame_RTC = None
 
+    from pymavlink import mavutil
+
+    def is_taking_off(self):
+        vehicle = getattr(self.dron, "vehicle", None)
+        if vehicle is None:
+            return False
+
+        msg = vehicle.recv_match(type='EXTENDED_SYS_STATE', blocking=False)
+        if msg is None:
+            return False
+
+        return msg.landed_state == mavutil.mavlink.MAV_LANDING_TAKEOFF_STATE_TAKEOFF
 
 
     def connect_drone(self):
@@ -99,6 +111,17 @@ class HexsoonController:
 
         self.is_connected = True
 
+    def can_send_velocities(self):
+        vehicle = getattr(self.dron, "vehicle", None)
+        if vehicle is None:
+            return False
+
+        msg = vehicle.recv_match(type='EXTENDED_SYS_STATE', blocking=False)
+        if msg is None:
+            return False
+
+        return msg.landed_state == mavutil.mavlink.MAV_LANDING_TAKEOFF_STATE_IN_AIR
+
 
     def disconnect_drone(self): 
         
@@ -111,7 +134,7 @@ class HexsoonController:
 
     def take_off_drone(self):
         
-        if self.is_connected:
+        if self.is_connected and self.is_taking_off():
 
             print(Fore.GREEN + "Taking off...")
             
@@ -287,9 +310,6 @@ class HexsoonController:
 
             else:
                 error_y = cy - self.panel_height / 2
-
-            self.integral_x += error_x
-            self.integral_y += error_y
             
             derivative_x = error_x - self.prev_error_x
             derivative_y = error_y - self.prev_error_y
@@ -335,9 +355,19 @@ class HexsoonController:
                 self.for_back = velocity_y
                 self.up_down = 0
 
+            if self.can_send_velocities():
+
+                self.integral_x += error_x
+                self.integral_y += error_y
+                self.set_velocity()
+
+        else:
+            self.left_right = 0
+            self.for_back = 0
+            self.up_down = 0
+
             self.set_velocity()
-                
-        
+
 
     def get_detected_frame(self, frame):
 
@@ -369,9 +399,9 @@ class HexsoonController:
         return img_dilated, img_contour
 
 
-    def get_frame(self, mode: str):
+    def get_frame(self):
 
-        if mode == "Simulation":
+        if self.try_mode == "Simulation":
             
             if self.camera_option == "Default Cam": 
             
@@ -404,7 +434,7 @@ class HexsoonController:
                 return self.get_detected_frame()
 
 
-        elif mode == "Practice":
+        elif self.try_mode == "Practice":
 
             if self.camera_option == "Raspi Cam": 
 

@@ -241,7 +241,7 @@ class GUI:
 
         Label(self.root, text="Camera Used =", font=("Arial", 14)).grid(row=1, column=6, padx=10, pady=10)
         Opt_cam = ["Default Cam", "Raspi Cam", "Panormaic Cam"]
-        self.camera_option = tk.StringVar(value="Default Camera")
+        self.camera_option = tk.StringVar(value="Default Cam")
         dropdown_cam_opt = tk.OptionMenu(self.root, self.camera_option, *Opt_cam)
         dropdown_cam_opt.grid(row=1, column=7, padx=9, pady=10)
 
@@ -534,14 +534,8 @@ class GUI:
         """Thread for getting camera frames"""
         while self.running:
             try:
-                
-                # Get frames based on mode
-                if self.controller.try_mode == "Practice":
-                    original_frame, detected_frame = self.controller.get_frame("Practice")
-                elif self.controller.try_mode == "Simulation":
-                    original_frame, detected_frame = self.controller.get_frame("Simulation")
-                else:
-                    original_frame, detected_frame = None, None
+                if self.controller.is_connected:
+                    original_frame, detected_frame = self.controller.get_frame()
                 
                 #if original_frame is not None and detected_frame is not None:
                 # Put frames in queue for video thread
@@ -569,6 +563,7 @@ class GUI:
         """Thread for getting Mission Planner frames"""
         
         while self.running:
+            
             try:
                 mission_frame = self.get_mission_planner_frame()
                 
