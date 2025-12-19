@@ -190,7 +190,7 @@ class GUI:
         #self.arm_button.grid(column=4, row=1, padx=10, pady=10)
 
         self.takeoff_height = tk.Entry(self.root, width=10)
-        self.takeoff_height.insert(0, "8")
+        self.takeoff_height.insert(0, "5")
         self.takeoff_height.grid(column=2, row=1, padx=10, pady=10)
 
         # Take off button - use controller.take_off_drone directly
@@ -248,11 +248,11 @@ class GUI:
     def create_pid_controls(self):
         self.Kp_x = tk.DoubleVar(value=0.1)
         self.Ki_x = tk.DoubleVar(value=0)
-        self.Kd_x = tk.DoubleVar(value=0.5)
+        self.Kd_x = tk.DoubleVar(value=0)
 
         self.Kp_y = tk.DoubleVar(value=0.1)
         self.Ki_y = tk.DoubleVar(value=0)
-        self.Kd_y = tk.DoubleVar(value=0.5)
+        self.Kd_y = tk.DoubleVar(value=0)
 
         self.create_pid_slider_set("X", 150)
         self.create_pid_slider_set("Y", 250)

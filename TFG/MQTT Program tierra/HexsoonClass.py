@@ -1,4 +1,5 @@
 import time
+import yaml
 
 from dronLink.Dron import Dron
 from ultralytics import YOLO
@@ -79,6 +80,12 @@ class HexsoonController:
         self.original_frame_RTC = None
         self.detected_frame_RTC = None
 
+        OUTPUT = 'output21'
+        yamlname = 'calibration_data_px.yaml'
+        self.data = None
+        with open(yamlname) as f:
+            self.data = yaml.safe_load(f)
+
     from pymavlink import mavutil
 
 
@@ -93,8 +100,8 @@ class HexsoonController:
             #self.stabilizeYaw()
 
         elif self.try_mode == "Practice":
-            self.dron.connect('tcp:127.0.0.1:5763', 115200)
-            #self.dron.connect('COM3', 57600)
+            #self.dron.connect('tcp:127.0.0.1:5763', 115200)
+            self.dron.connect('COM3', 57600)
             #self.stabilizeYaw()
             pass
 
@@ -160,7 +167,7 @@ class HexsoonController:
 
     def set_velocity(self):
 
-        # 🚫 BLOQUEO GLOBAL
+
         if not self.take_off_finalizado:
             return
 
@@ -200,7 +207,19 @@ class HexsoonController:
                 if not ret:
                     return None, None
 
-                return frame, None  # No detected frame for webcam
+
+                cam_matrix = np.array(self.data['camera_matrix'])
+                dist_coefs = np.array(self.data['distortion_coefficients'])
+                h, w = 480, 640
+                new_cam_mtx, roi = cv2.getOptimalNewCameraMatrix(cam_matrix, dist_coefs, (w, h), 1, (w, h))
+                x, y, w, h = roi
+                u_img = cv2.undistort(frame, cam_matrix, dist_coefs, None, new_cam_mtx)
+
+                # crop and save the undistorted image
+                dst = u_img[y:y + h, x:x + w]
+                dst = cv2.flip(dst, 1)
+
+                return dst, None  # No detected frame for webcam
             
             except: 
                 return None, None
@@ -367,9 +386,6 @@ class HexsoonController:
 
     def get_detected_frame(self, frame):
 
-        '''
-            Returns the dilated frame.
-        '''
 
         frame_display = cv2.resize(frame, (self.panel_width, self.panel_height))
         frame_hsv = cv2.cvtColor(frame_display, cv2.COLOR_BGR2HSV)
@@ -385,6 +401,8 @@ class HexsoonController:
         img_canny = cv2.Canny(img_grey, self.t1, self.t2)
         kernel = np.ones((5, 5), np.uint8)
         img_dilated = cv2.dilate(img_canny, kernel, iterations=1)
+
+        ''''''
 
         img_contour = frame_display.copy()
 
@@ -432,7 +450,16 @@ class HexsoonController:
 
         elif self.try_mode == "Practice":
 
-            if self.camera_option == "Raspi Cam": 
+            if self.camera_option == "Default Cam":
+
+                original_frame, _ = self.cap_frame(self.camera_option)
+
+                if not original_frame:
+                    return None, None
+
+                return self.get_detected_frame()
+
+            elif self.camera_option == "Raspi Cam":
 
                 if self.original_frame_RTC is None:
                     return None, None
