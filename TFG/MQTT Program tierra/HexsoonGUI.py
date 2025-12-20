@@ -67,7 +67,7 @@ class GUI:
         self.thread_velocities.start()  
         self.thread_get_frame.start()
         self.thread_get_mission_planner.start()
-        
+
         # Start main update loop
         self.update_frame()
 
@@ -240,7 +240,7 @@ class GUI:
         Label(self.root, text="Mode used =", font=("Arial", 14)).grid(row=0, column=8, padx=10, pady=10)
 
         Label(self.root, text="Camera Used =", font=("Arial", 14)).grid(row=1, column=6, padx=10, pady=10)
-        Opt_cam = ["Default Cam", "Raspi Cam", "Panormaic Cam"]
+        Opt_cam = ["Default Cam", "Raspi Cam", "Panoramic Cam"]
         self.camera_option = tk.StringVar(value="Default Cam")
         dropdown_cam_opt = tk.OptionMenu(self.root, self.camera_option, *Opt_cam)
         dropdown_cam_opt.grid(row=1, column=7, padx=9, pady=10)
@@ -538,14 +538,15 @@ class GUI:
         """Thread for getting camera frames"""
         while self.running:
             try:
+                original_frame, detected_frame = None, None
                 if self.controller.is_connected:
                     original_frame, detected_frame = self.controller.get_frame()
-                
+
                 #if original_frame is not None and detected_frame is not None:
                 # Put frames in queue for video thread
                 if not self.video_queue.full():
                     self.video_queue.put((original_frame, detected_frame), timeout=0.1)
-                
+
                 # Put velocity data in queue
                 if not self.velocity_queue.full():
                     self.velocity_queue.put((
@@ -554,9 +555,9 @@ class GUI:
                         self.controller.up_down,
                         self.controller.yaw
                     ), timeout=0.1)
-                
+
                 time.sleep(0.033)  # ~30 FPS
-                
+
             except queue.Full:
                 time.sleep(0.01)
             except Exception as e:

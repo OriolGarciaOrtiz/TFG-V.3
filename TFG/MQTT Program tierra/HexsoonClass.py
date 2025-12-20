@@ -9,6 +9,8 @@ from pymavlink import mavutil
 from dronLink.modules.dron_move import _prepare_command_mov
 import base64
 from colorama import init, Fore
+import threading
+import queue
 
 class HexsoonController:
     def __init__(self):
@@ -20,7 +22,7 @@ class HexsoonController:
         init(autoreset=True)
 
         try:
-            self.model = YOLO("Modelo3(RCGrande).pt")
+            self.model = YOLO("RC_exterior.pt")
             print(Fore.GREEN + "YOLO model loaded successfully.")
         except Exception as e:
             print(Fore.RED + "Could not load YOLO model:", e)
@@ -58,7 +60,7 @@ class HexsoonController:
 
         self.try_mode = "Practice"
 
-        self.camera_option = "Default Camera"
+        self.camera_option = "Default Cam"
 
         self.click_connect = False
         self.click_disconnect = False
@@ -80,11 +82,22 @@ class HexsoonController:
         self.original_frame_RTC = None
         self.detected_frame_RTC = None
 
-        OUTPUT = 'output21'
         yamlname = 'calibration_data_px.yaml'
         self.data = None
         with open(yamlname) as f:
             self.data = yaml.safe_load(f)
+
+
+        self.yolo_queue = queue.Queue(maxsize=1)
+        self.yolo_result = (None, [])  # (object_center, boxes_info)
+        self.yolo_lock = threading.Lock()
+        self.yolo_running = True
+
+        self.yolo_thread = threading.Thread(
+            target=self._yolo_worker_loop,
+            daemon=True
+        )
+        self.yolo_thread.start()
 
     from pymavlink import mavutil
 
@@ -128,21 +141,15 @@ class HexsoonController:
         print(Fore.GREEN + "Taking off...")
 
 
-        # 2️⃣ Armado
         self.dron.arm()
         time.sleep(0.5)
 
-        # 3️⃣ Takeoff
         self.dron.takeOff(self.take_off_alt)
 
         time.sleep(10)#Esperar x segundos a terminar el take off
-
-        # 5️⃣ Ahora SÍ: despegue completado
         print(Fore.GREEN + "Takeoff completado")
 
         self.take_off_finalizado = True
-
-        # 6️⃣ AHORA bloqueas el yaw
         self.stabilizeYaw()
 
     def land_drone(self):
@@ -197,7 +204,7 @@ class HexsoonController:
         """
 
         # ------------------------- PC CAMERA MODE -------------------------
-        if mode == "Default Cam": #Yo haría que solo existiera esta método para video capture y if mode=Panormaic que ha esta parte *
+        if mode == "Default Cam":
 
             try: 
                 if self.cap is None:
@@ -207,19 +214,8 @@ class HexsoonController:
                 if not ret:
                     return None, None
 
-                #*
-                cam_matrix = np.array(self.data['camera_matrix'])
-                dist_coefs = np.array(self.data['distortion_coefficients'])
-                h, w = 480, 640
-                new_cam_mtx, roi = cv2.getOptimalNewCameraMatrix(cam_matrix, dist_coefs, (w, h), 1, (w, h))
-                x, y, w, h = roi
-                u_img = cv2.undistort(frame, cam_matrix, dist_coefs, None, new_cam_mtx)
 
-                # crop and save the undistorted image
-                dst = u_img[y:y + h, x:x + w]
-                dst = cv2.flip(dst, 1)
-
-                return dst, None  # No detected frame for webcam
+                return self.get_detected_frame(frame)  # No detected frame for webcam
             
             except: 
                 return None, None
@@ -232,79 +228,144 @@ class HexsoonController:
             return self.original_frame_RTC, self.detected_frame_RTC
         
         # ------------------------- PC CAMERA MODE -------------------------
-        elif mode == "Panormaic Cam":
+        elif mode == "Panoramic Cam":
 
             try:
-            
-                self.cap = cv2.VideoCapture(1)
-
+                if self.cap is None:
+                    self.cap = cv2.VideoCapture(0)
                 ret, frame = self.cap.read()
                 if not ret:
                     return None, None
-                
-                return frame, None
+
+
+                cam_matrix = np.array(self.data['camera_matrix'])
+                dist_coefs = np.array(self.data['distortion_coefficients'])
+                h, w = 480, 640
+                new_cam_mtx, roi = cv2.getOptimalNewCameraMatrix(cam_matrix, dist_coefs, (w, h), 1, (w, h))
+                x, y, w, h = roi
+                u_img = cv2.undistort(frame, cam_matrix, dist_coefs, None, new_cam_mtx)
+
+                # crop and save the undistorted image
+                dst = u_img[y:y + h, x:x + w]
+                dst = cv2.flip(dst, 1)
+
+                return self.get_detected_frame(dst)
             except:
                 return None, None
             
         # ------------------------- UNKNOWN MODE -------------------------
         return None, None
 
-        
+    def _yolo_worker_loop(self):
+        while self.yolo_running:
+            frame = self.yolo_queue.get()
+            try:
+                results = self.model.predict(frame, conf=0.3, verbose=False)
+
+                object_center = None
+                boxes_info = []
+                max_area = 0
+
+                for r in results:
+                    for box in r.boxes:
+                        x1, y1, x2, y2 = map(int, box.xyxy[0])
+                        w, h = x2 - x1, y2 - y1
+                        area = w * h
+                        conf = float(box.conf[0])
+                        cls = int(box.cls[0])
+                        label = self.model.names[cls]
+
+                        boxes_info.append((x1, y1, x2, y2, label, conf))
+
+                        if area > max_area:
+                            max_area = area
+                            object_center = (x1 + w // 2, y1 + h // 2)
+
+                with self.yolo_lock:
+                    self.yolo_result = (object_center, boxes_info)
+
+            except Exception as e:
+                print(Fore.RED + f"YOLO worker error: {e}")
+                with self.yolo_lock:
+                    self.yolo_result = (None, [])
 
     def get_object_center(self, dil_frame, img_contour):
+        """
+        Returns the center of the detected object.
+        """
 
-        '''
-            Returns the center of the detected object.
-        '''
-
+        # -------------------- COLOR CONTOUR MODE --------------------
         if self.detection_mode == "Color Contour":
-            contours, _ = cv2.findContours(dil_frame, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+            contours, _ = cv2.findContours(
+                dil_frame, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
+            )
+
             if contours:
                 c = max(contours, key=cv2.contourArea)
-                x, y, w, h = cv2.boundingRect(c)
-                if cv2.contourArea(c) > 300:
-                    cv2.rectangle(img_contour, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                area = cv2.contourArea(c)
+
+                if area > 300:
+                    x, y, w, h = cv2.boundingRect(c)
                     object_center = (x + w // 2, y + h // 2)
-                    cv2.circle(img_contour, object_center, 5, (255, 0, 0), cv2.FILLED)
+
+                    cv2.rectangle(
+                        img_contour, (x, y), (x + w, y + h), (0, 255, 0), 2
+                    )
+                    cv2.circle(
+                        img_contour, object_center, 5, (255, 0, 0), cv2.FILLED
+                    )
 
                     return object_center, img_contour
 
-        elif self.detection_mode == "Neural Network":
-            results = self.model.predict(img_contour, conf=0.5, verbose=False)
+            return None, img_contour
 
-            max_area = 0
+        # -------------------- NEURAL NETWORK MODE --------------------
+        elif self.detection_mode == "Neural Network" and self.model is not None:
 
-            best_box = None
+            # Intentar mandar frame al worker (NO BLOQUEANTE)
+            try:
+                self.yolo_queue.put_nowait(img_contour.copy())
+            except Exception:
+                # YOLO sigue ocupado → seguimos usando el último resultado
+                pass
 
-            for result in results:
-                boxes = result.boxes
-                for box in boxes:
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    area = (x2 - x1) * (y2 - y1)
-                    if area > max_area:
-                        max_area = area
-                        best_box = (x1, y1, x2, y2)
+            # Recuperar último resultado procesado
+            with self.yolo_lock:
+                object_center, boxes_info = self.yolo_result
 
-            if best_box is not None:
-                x1, y1, x2, y2 = best_box
-                w, h = x2 - x1, y2 - y1
-                cx, cy = x1 + w // 2, y1 + h // 2
-                object_center = (cx, cy)  # <-- fix here
-                cls = int(box.cls[0])
-                conf = float(box.conf[0])
-                label = f"{self.model.names[cls]} {conf:.2f}"
-                cv2.rectangle(img_contour, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.putText(img_contour, label, (x1, y1 - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
-                cv2.circle(img_contour, object_center, 5, (255, 0, 0), cv2.FILLED)
+            # Dibujar detecciones (si existen)
+            if boxes_info:
+                for (x1, y1, x2, y2, label, conf) in boxes_info:
+                    cv2.rectangle(
+                        img_contour, (x1, y1), (x2, y2), (0, 255, 0), 2
+                    )
+                    cv2.putText(
+                        img_contour,
+                        f"{label} {conf:.2f}",
+                        (x1, y1 - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5,
+                        (255, 0, 0),
+                        2
+                    )
 
-                return object_center, img_contour
+                if object_center is not None:
+                    cv2.circle(img_contour, object_center, 5, (255, 0, 0), cv2.FILLED)
 
+            return object_center, img_contour
+
+        # -------------------- NO MODE SELECTED --------------------
         else:
-            cv2.putText(img_contour, "No detection mode selected", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-
-        return None, img_contour
-    
+            cv2.putText(
+                img_contour,
+                "No detection mode selected",
+                (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (0, 0, 255),
+                2,
+            )
+            return None, img_contour
 
     def get_velocities(self, oject_center):
 
@@ -316,12 +377,7 @@ class HexsoonController:
 
             cx, cy = oject_center
             error_x = cx - self.panel_width / 2
-
-            # if self.view_mode == "Front View":
-            #     error_y = self.panel_height / 2 - cy
-            #
-            # else:
-            error_y = cy - self.panel_height / 2 #Como en este caso la camara no es un espejo así está bien
+            error_y = self.panel_height / 2- cy #Como en este caso la camara no es un espejo así está bien
             
             derivative_x = error_x - self.prev_error_x
             derivative_y = error_y - self.prev_error_y
@@ -412,72 +468,20 @@ class HexsoonController:
 
         return img_dilated, img_contour
 
-
     def get_frame(self):
 
-        if self.try_mode == "Simulation":
-            
-            if self.camera_option == "Default Cam": 
-            
-                original_frame, _ = self.cap_frame(self.camera_option)
+        try:
 
-                if original_frame is None:
-                    return None, None
+            original_frame, detected_frame = self.cap_frame(self.camera_option)
 
-                return self.get_detected_frame(original_frame)
-            
+            if original_frame is None:
+                return None, None
 
-            elif self.camera_option == "Raspi Cam": 
+            return original_frame, detected_frame
 
-                original_frame, _ = self.cap_frame(self.camera_option)
+        except:
 
-                if original_frame is None:
-
-                    return None, None
-
-                return self.get_detected_frame(original_frame)
-
-            elif self.camera_option == "Panoramic Cam":
-
-                original_frame, _  = self.cap_frame(self.camera_option)
-
-                if not original_frame:
-
-                    return None, None
-            
-                return self.get_detected_frame()
-
-
-        elif self.try_mode == "Practice":
-
-            if self.camera_option == "Default Cam":
-
-                original_frame, _ = self.cap_frame(self.camera_option)
-
-                if not original_frame:
-                    return None, None
-
-                return self.get_detected_frame()
-
-            elif self.camera_option == "Raspi Cam":
-
-                if self.original_frame_RTC is None:
-                    return None, None
-
-                return self.original_frame_RTC, self.detected_frame_RTC
-
-            elif self.camera_option == "Panormaic Cam":
-
-                original_frame, _  = self.cap_frame(self.camera_option)
-
-                if not original_frame:
-
-                    return None, None
-            
-                return self.get_detected_frame()
-
-        # UNKNOWN
-        return None, None
+            return None, None
     
 
     def set_param(self, name, value):
