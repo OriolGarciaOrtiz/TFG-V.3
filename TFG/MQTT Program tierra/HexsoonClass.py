@@ -263,14 +263,14 @@ class HexsoonController:
                 c = max(contours, key=cv2.contourArea)
                 x, y, w, h = cv2.boundingRect(c)
                 if cv2.contourArea(c) > 300:
-                    cv2.rectangle(dil_frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                    cv2.rectangle(img_contour, (x, y), (x + w, y + h), (0, 255, 0), 2)
                     object_center = (x + w // 2, y + h // 2)
                     cv2.circle(img_contour, object_center, 5, (255, 0, 0), cv2.FILLED)
 
                     return object_center, img_contour
 
         elif self.detection_mode == "Neural Network":
-            results = self.model.track(frame=img_contour, conf=0.5, persist=True, verbose=False)
+            results = self.model.predict(img_contour, conf=0.5, verbose=False)
 
             max_area = 0
 
@@ -295,7 +295,7 @@ class HexsoonController:
                 label = f"{self.model.names[cls]} {conf:.2f}"
                 cv2.rectangle(img_contour, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 cv2.putText(img_contour, label, (x1, y1 - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
                 cv2.circle(img_contour, object_center, 5, (255, 0, 0), cv2.FILLED)
 
                 return object_center, img_contour
