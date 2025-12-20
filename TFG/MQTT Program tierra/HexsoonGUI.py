@@ -416,6 +416,10 @@ class GUI:
         """Transfer GUI settings to controller"""
         self.controller.h_min = self.h_min.get()
         self.controller.h_max = self.h_max.get()
+        self.controller.s_min = self.s_min.get()
+        self.controller.s_max = self.s_max.get()
+        self.controller.v_min = self.v_min.get()
+        self.controller.v_max = self.v_max.get()
         self.controller.t1 = self.t1.get()
         self.controller.t2 = self.t2.get()
         self.controller.detection_mode = self.detection_var.get()

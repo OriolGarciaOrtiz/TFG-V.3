@@ -20,7 +20,7 @@ class HexsoonController:
         init(autoreset=True)
 
         try:
-            self.model = YOLO("best_RC_Final.pt")
+            self.model = YOLO("Modelo3(RCGrande).pt")
             print(Fore.GREEN + "YOLO model loaded successfully.")
         except Exception as e:
             print(Fore.RED + "Could not load YOLO model:", e)
@@ -197,7 +197,7 @@ class HexsoonController:
         """
 
         # ------------------------- PC CAMERA MODE -------------------------
-        if mode == "Default Cam":
+        if mode == "Default Cam": #Yo haría que solo existiera esta método para video capture y if mode=Panormaic que ha esta parte *
 
             try: 
                 if self.cap is None:
@@ -207,7 +207,7 @@ class HexsoonController:
                 if not ret:
                     return None, None
 
-
+                #*
                 cam_matrix = np.array(self.data['camera_matrix'])
                 dist_coefs = np.array(self.data['distortion_coefficients'])
                 h, w = 480, 640
@@ -317,11 +317,11 @@ class HexsoonController:
             cx, cy = oject_center
             error_x = cx - self.panel_width / 2
 
-            if self.view_mode == "Front View":
-                error_y = self.panel_height / 2 - cy    
-
-            else:
-                error_y = cy - self.panel_height / 2
+            # if self.view_mode == "Front View":
+            #     error_y = self.panel_height / 2 - cy
+            #
+            # else:
+            error_y = cy - self.panel_height / 2 #Como en este caso la camara no es un espejo así está bien
             
             derivative_x = error_x - self.prev_error_x
             derivative_y = error_y - self.prev_error_y
@@ -381,7 +381,7 @@ class HexsoonController:
             self.up_down = 0
             self.integral_x=0
             self.integral_y=0
-            #self.set_velocity()
+            self.set_velocity()
 
 
     def get_detected_frame(self, frame):
