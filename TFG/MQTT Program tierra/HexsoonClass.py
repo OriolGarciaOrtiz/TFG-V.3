@@ -11,6 +11,7 @@ import base64
 from colorama import init, Fore
 import threading
 import queue
+from tkinter import Tk, filedialog
 
 class HexsoonController:
     def __init__(self):
@@ -21,12 +22,7 @@ class HexsoonController:
 
         init(autoreset=True)
 
-        try:
-            self.model = YOLO("RC_exterior.pt")
-            print(Fore.GREEN + "YOLO model loaded successfully.")
-        except Exception as e:
-            print(Fore.RED + "Could not load YOLO model:", e)
-            self.model = None
+        self.model = None
 
         self.panel_width = 320
         self.panel_height = 240
@@ -171,6 +167,23 @@ class HexsoonController:
         if self.is_connected:
             
             self.dron.arm()
+
+    def load_model(self):
+
+        archivo = filedialog.askopenfilename(
+            title="Seleccionar archivo",
+            filetypes=[("Models Yolo", "*.pt")],
+            initialdir="Yolo Models"
+        )
+
+        try: 
+
+            self.model = YOLO(archivo)
+            print(Fore.GREEN + "YOLO model correctly loaded")
+
+        except:
+
+            print(Fore.RED + "Error loading YOLO model")
 
     def set_velocity(self):
 

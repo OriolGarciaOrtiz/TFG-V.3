@@ -41,7 +41,9 @@ class HexsoonController:
             self.cap.configure(config)
             self.cap.start()
             '''
-            self.cap = 1
+            if self.cap is None:
+
+                self.cap = cv2.VideoCapture(0)
 
             print("Picamera2 initialized.")
         except Exception as e:
@@ -53,9 +55,13 @@ class HexsoonController:
             return None
         try:
 
-            frame = cv2.imread("IMG_20251112_155906_TIMEBURST1.jpg")
-            #frame = self.cap.capture_array()
+            ret, frame = self.cap.read()
 
+            if not ret and not self.cap.isOpened():
+                return None
+                
+            #frame = self.cap.capture_array()
+            frame = cv2.resize(frame, (320, 240))
             return frame
         except:
             return None

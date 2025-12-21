@@ -205,13 +205,17 @@ class GUI:
 
         # Disconnect button - use controller.disconnect_drone directly
         self.disconnect_button = tk.Button(self.root, text="Disconnect",
-                                          command=lambda: self.run_in_thread(self.controller.disconnect_drone))
+                                        command=lambda: self.run_in_thread(self.controller.disconnect_drone))
         self.disconnect_button.grid(column=3, row=2, padx=10, pady=10)
 
         # RTL button - use controller.Return_To_Launch_drone directly
         self.RTL_button = tk.Button(self.root, text="RTL",
-                                   command=lambda: self.run_in_thread(self.controller.Return_To_Launch_drone))
+                                        command=lambda: self.run_in_thread(self.controller.Return_To_Launch_drone))
         self.RTL_button.grid(column=4, row=2, padx=10, pady=10)
+
+        self.load_model_button = tk.Button(self.root, text="Load Yolo model", 
+                                        command=lambda: self.run_in_thread(self.controller.load_model))
+        self.load_model_button.grid(column=8, row=1, padx=10, pady=10)
 
     def create_mode_selectors(self):
         self.simulation_var = tk.StringVar(value="Simulation")
@@ -588,7 +592,7 @@ class GUI:
 
             self.transfer_data()
 
-            # Update connection status
+            # Update connection status                                                                                                                                                                       
             if self.controller.is_connected:
                 status_text = "Connected"
                 color = "green"
@@ -600,8 +604,7 @@ class GUI:
                 
             self.connected_label.config(text=status_text, fg=color)
             
-            # Send ALL data every 0.5 seconds in Practice mode
-            if self.controller.try_mode == "Practice":
+            if self.controller.camera_option == "Raspi Cam":
                 self.send_data()
             
         except Exception as e:
