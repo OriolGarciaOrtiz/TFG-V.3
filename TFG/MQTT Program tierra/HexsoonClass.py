@@ -11,18 +11,23 @@ import base64
 from colorama import init, Fore
 import threading
 import queue
-from tkinter import Tk, filedialog
+
 
 class HexsoonController:
     def __init__(self):
         self.is_connected = False
         self.dron = Dron()
         self.cap = None
-        self.take_off_finalizado=False
+        self.take_off_finalizado = False
 
         init(autoreset=True)
 
-        self.model = None
+        try:
+            self.model = YOLO("RC_exterior.pt")
+            print(Fore.GREEN + "YOLO model loaded successfully.")
+        except Exception as e:
+            print(Fore.RED + "Could not load YOLO model:", e)
+            self.model = None
 
         self.panel_width = 320
         self.panel_height = 240
@@ -37,7 +42,7 @@ class HexsoonController:
         self.t1 = 0
         self.t2 = 255
 
-        self.detection_mode = "Color Contour"   # or "Neural Network" or None
+        self.detection_mode = "Color Contour"  # or "Neural Network" or None
 
         self.Kp_x = 0
         self.Ki_x = 0
@@ -46,13 +51,13 @@ class HexsoonController:
         self.Ki_y = 0
         self.Kd_y = 0
 
-        self.PID_mode = "PID"   # or "P", "I", "D", etc.
+        self.PID_mode = "PID"  # or "P", "I", "D", etc.
 
         self.max_velocity = 50
 
         self.view_mode = "Front View"  # or "Down View" etc.
 
-        self.take_off_alt = 5
+        self.take_off_alt = 2
 
         self.try_mode = "Practice"
 
@@ -83,7 +88,6 @@ class HexsoonController:
         with open(yamlname) as f:
             self.data = yaml.safe_load(f)
 
-
         self.yolo_queue = queue.Queue(maxsize=1)
         self.yolo_result = (None, [])  # (object_center, boxes_info)
         self.yolo_lock = threading.Lock()
@@ -97,8 +101,6 @@ class HexsoonController:
 
     from pymavlink import mavutil
 
-
-
     def connect_drone(self):
 
         self.click_connect = True
@@ -106,27 +108,24 @@ class HexsoonController:
         if self.try_mode == "Simulation":
             self.dron.connect('tcp:127.0.0.1:5763', 115200)
 
-            #self.stabilizeYaw()
+            # self.stabilizeYaw()
 
         elif self.try_mode == "Practice":
-            #self.dron.connect('tcp:127.0.0.1:5763', 115200)
-            self.dron.connect('COM3', 57600)
-            #self.stabilizeYaw()
+            # self.dron.connect('tcp:127.0.0.1:5763', 115200)
+            self.dron.connect('COM4', 57600)
+            # self.stabilizeYaw()
             pass
 
         else:
             raise ValueError(Fore.RED + "Unknown connection mode selected")
-        
 
         self.is_connected = True
 
-
     def disconnect_drone(self):
-        
+
         if self.is_connected:
-            
             self.click_disconnect = True
-            self.is_connected = False  
+            self.is_connected = False
             self.dron.disconnect()
 
     def take_off_drone(self):
@@ -136,57 +135,33 @@ class HexsoonController:
 
         print(Fore.GREEN + "Taking off...")
 
-
         self.dron.arm()
         time.sleep(0.5)
 
         self.dron.takeOff(self.take_off_alt)
 
-        time.sleep(10)#Esperar x segundos a terminar el take off
-        print(Fore.GREEN + "Takeoff completado")
+        time.sleep(10)  # Esperar x segundos a terminar el take off
+        print("Takeoff completado")
 
         self.take_off_finalizado = True
         self.stabilizeYaw()
 
     def land_drone(self):
-        
+
         if self.is_connected:
-            
             self.dron.Land()
 
-
     def Return_To_Launch_drone(self):
-        
+
         if self.is_connected:
-            
             self.dron.RTL()
 
-
     def arm_drone(self):
-        
+
         if self.is_connected:
-            
             self.dron.arm()
 
-    def load_model(self):
-
-        archivo = filedialog.askopenfilename(
-            title="Seleccionar archivo",
-            filetypes=[("Models Yolo", "*.pt")],
-            initialdir="Yolo Models"
-        )
-
-        try: 
-
-            self.model = YOLO(archivo)
-            print(Fore.GREEN + "YOLO model correctly loaded")
-
-        except:
-
-            print(Fore.RED + "Error loading YOLO model")
-
     def set_velocity(self):
-
 
         if not self.take_off_finalizado:
             return
@@ -210,16 +185,38 @@ class HexsoonController:
         frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
         return frame
 
+    def zoom_frame(self, frame, zoom_factor=1.5):
 
+        if zoom_factor <= 1.0:
+            return frame
+
+        h, w = frame.shape[:2]
+
+        new_w = int(w / zoom_factor)
+        new_h = int(h / zoom_factor)
+
+        cx, cy = w // 2, h // 2
+
+        x1 = max(cx - new_w // 2, 0)
+        y1 = max(cy - new_h // 2, 0)
+        x2 = min(cx + new_w // 2, w)
+        y2 = min(cy + new_h // 2, h)
+
+        cropped = frame[y1:y2, x1:x2]
+
+        zoomed = cv2.resize(
+            cropped,
+            (w, h),
+            interpolation=cv2.INTER_LINEAR
+        )
+
+        return zoomed
     def cap_frame(self, mode: str):
-        """
-        Returns (original, detected) depending on the input mode and try_mode.
-        """
 
         # ------------------------- PC CAMERA MODE -------------------------
         if mode == "Default Cam":
 
-            try: 
+            try:
                 if self.cap is None:
                     self.cap = cv2.VideoCapture(0)
 
@@ -227,19 +224,18 @@ class HexsoonController:
                 if not ret:
                     return None, None
 
-
                 return self.get_detected_frame(frame)  # No detected frame for webcam
-            
-            except: 
+
+            except:
                 return None, None
-        
+
         # ------------------------- PC CAMERA MODE -------------------------
         elif mode == "Raspi Cam":
             if self.original_frame_RTC is None:
                 return None, None
 
             return self.original_frame_RTC, self.detected_frame_RTC
-        
+
         # ------------------------- PC CAMERA MODE -------------------------
         elif mode == "Panoramic Cam":
 
@@ -249,7 +245,6 @@ class HexsoonController:
                 ret, frame = self.cap.read()
                 if not ret:
                     return None, None
-
 
                 cam_matrix = np.array(self.data['camera_matrix'])
                 dist_coefs = np.array(self.data['distortion_coefficients'])
@@ -262,10 +257,13 @@ class HexsoonController:
                 dst = u_img[y:y + h, x:x + w]
                 dst = cv2.flip(dst, 1)
 
+                dst = self.zoom_frame(dst, zoom_factor=1.5)
+
                 return self.get_detected_frame(dst)
+
             except:
                 return None, None
-            
+
         # ------------------------- UNKNOWN MODE -------------------------
         return None, None
 
@@ -303,24 +301,22 @@ class HexsoonController:
                     self.yolo_result = (None, [])
 
     def get_object_center(self, dil_frame, img_contour):
-        """
-        Returns the center of the detected object.
-        """
 
         # -------------------- COLOR CONTOUR MODE --------------------
         if self.detection_mode == "Color Contour":
             contours, _ = cv2.findContours(
                 dil_frame, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
             )
-
+            #print(contours)
             if contours:
+                #print("Entra en contorno")
                 c = max(contours, key=cv2.contourArea)
                 area = cv2.contourArea(c)
 
-                if area > 300:
+                if area > 100:
                     x, y, w, h = cv2.boundingRect(c)
                     object_center = (x + w // 2, y + h // 2)
-
+                    #print("Entra en area mínima")
                     cv2.rectangle(
                         img_contour, (x, y), (x + w, y + h), (0, 255, 0), 2
                     )
@@ -329,7 +325,8 @@ class HexsoonController:
                     )
 
                     return object_center, img_contour
-
+            else:
+                print("NO ENTRA EN CONTORNO")
             return None, img_contour
 
         # -------------------- NEURAL NETWORK MODE --------------------
@@ -390,8 +387,8 @@ class HexsoonController:
 
             cx, cy = oject_center
             error_x = cx - self.panel_width / 2
-            error_y = self.panel_height / 2- cy #Como en este caso la camara no es un espejo así está bien
-            
+            error_y = self.panel_height / 2 - cy  # Como en este caso la camara no es un espejo así está bien. CAMBIAR si la camara no se cambia de lado
+
             derivative_x = error_x - self.prev_error_x
             derivative_y = error_y - self.prev_error_y
 
@@ -437,7 +434,7 @@ class HexsoonController:
                 self.up_down = 0
 
             if self.take_off_finalizado:
-                #print("Empieza a enviar velocidades")
+                # print("Empieza a enviar velocidades")
                 self.integral_x += error_x
                 self.integral_y += error_y
                 self.set_velocity()
@@ -448,13 +445,11 @@ class HexsoonController:
             self.left_right = 0
             self.for_back = 0
             self.up_down = 0
-            self.integral_x=0
-            self.integral_y=0
+            self.integral_x = 0
+            self.integral_y = 0
             self.set_velocity()
 
-
     def get_detected_frame(self, frame):
-
 
         frame_display = cv2.resize(frame, (self.panel_width, self.panel_height))
         frame_hsv = cv2.cvtColor(frame_display, cv2.COLOR_BGR2HSV)
@@ -495,7 +490,6 @@ class HexsoonController:
         except:
 
             return None, None
-    
 
     def set_param(self, name, value):
 
@@ -507,7 +501,7 @@ class HexsoonController:
         # En el firmware ArduCopter cuando se envia un mensaje SET_POSITION_TARGET_LOCAL_NED con velocidades laterales (vy) en BODY_NED,el controlador interno asume que estás pidiendo
         # “moverte lateralmente respecto al rumbo actual”.Pero si el yaw no está bloqueado o el modo GUIDED no está limitado, el autopiloto interpreta el movimiento lateral como una
         # instrucción de girar el yaw para “alinearse” con el vector de velocidad, es decir, ArduCopter intenta mirar hacia donde te mueves.
-        # Por ello he hecho esta función que mantiene el headind fijo y bloquea el yaw en modo guided cambiando las opciones de modo 0 a modo 8   
+        # Por ello he hecho esta función que mantiene el headind fijo y bloquea el yaw en modo guided cambiando las opciones de modo 0 a modo 8
 
         vehicle: mavutil.mavfile = getattr(self.dron, "vehicle", None)
         msg = mavutil.mavlink.MAVLink_param_set_message(
@@ -518,7 +512,6 @@ class HexsoonController:
             mavutil.mavlink.MAV_PARAM_TYPE_REAL32
         )
         vehicle.mav.send(msg)
-
 
     def stabilizeYaw(self):
         self.set_param("WP_YAW_BEHAVIOR", 0)  # Mantener heading fijo
