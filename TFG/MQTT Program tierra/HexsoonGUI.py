@@ -83,9 +83,9 @@ class GUI:
         self.create_velocity_display()
 
     def on_message(self, client, userdata, msg):
-        if self.controller.try_mode == "Practice":
-            # text = msg.payload.decode('utf-8')#No sé que hacer con esto, lo dejo?
-            # self.set_data(text)
+        if self.controller.camera_option == "Raspi Cam":
+            text = msg.payload.decode('utf-8')
+            self.set_data(text)
             pass
 
     def set_data(self, msg: str):
@@ -211,6 +211,10 @@ class GUI:
         self.RTL_button = tk.Button(self.root, text="RTL",
                                     command=lambda: self.run_in_thread(self.controller.Return_To_Launch_drone))
         self.RTL_button.grid(column=4, row=2, padx=10, pady=10)
+        
+        self.load_model_button = tk.Button(self.root, text="Load Yolo model", 
+                                        command=lambda: self.run_in_thread(self.controller.load_model))
+        self.load_model_button.grid(column=8, row=1, padx=10, pady=10)
 
     def create_mode_selectors(self):
         self.simulation_var = tk.StringVar(value="Simulation")
@@ -522,7 +526,7 @@ class GUI:
                     self.controller.set_velocity()
                     self.root.after(0, self.update_velocity_labels)
 
-                time.sleep(0.05)  # 20 Hz update rate
+                time.sleep(0.05)
 
             except queue.Empty:
                 time.sleep(0.01)
@@ -545,8 +549,6 @@ class GUI:
                 if self.controller.is_connected:
                     original_frame, detected_frame = self.controller.get_frame()
 
-                # if original_frame is not None and detected_frame is not None:
-                # Put frames in queue for video thread
                 if not self.video_queue.full():
                     self.video_queue.put((original_frame, detected_frame), timeout=0.1)
 
@@ -591,7 +593,6 @@ class GUI:
 
             self.transfer_data()
 
-            # Update connection status
             if self.controller.is_connected:
                 status_text = "Connected"
                 color = "green"
@@ -603,14 +604,12 @@ class GUI:
 
             self.connected_label.config(text=status_text, fg=color)
 
-            # Send ALL data every 0.5 seconds in Practice mode
-            if self.controller.try_mode == "Practice" and self.camera_option.get()=="Raspi Cam":
+            if self.camera_option.get() == "Raspi Cam":
                 self.send_data()
 
         except Exception as e:
             print(Fore.RED + f"Error in update_frame: {e}")
 
-        # Schedule next update
         self.root.after(30, self.update_frame)
 
     def cleanup(self):

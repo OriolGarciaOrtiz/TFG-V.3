@@ -1,6 +1,6 @@
 import time
 import yaml
-
+from tkinter import filedialog
 from dronLink.Dron import Dron
 from ultralytics import YOLO
 import cv2
@@ -22,12 +22,7 @@ class HexsoonController:
 
         init(autoreset=True)
 
-        try:
-            self.model = YOLO("RC_exterior.pt")
-            print(Fore.GREEN + "YOLO model loaded successfully.")
-        except Exception as e:
-            print(Fore.RED + "Could not load YOLO model:", e)
-            self.model = None
+        self.model = None
 
         self.panel_width = 320
         self.panel_height = 240
@@ -42,7 +37,7 @@ class HexsoonController:
         self.t1 = 0
         self.t2 = 255
 
-        self.detection_mode = "Color Contour"  # or "Neural Network" or None
+        self.detection_mode = "Color Contour"
 
         self.Kp_x = 0
         self.Ki_x = 0
@@ -99,7 +94,22 @@ class HexsoonController:
         )
         self.yolo_thread.start()
 
-    from pymavlink import mavutil
+    def load_model(self):
+
+        archivo = filedialog.askopenfilename(
+            title="Seleccionar archivo",
+            filetypes=[("Models Yolo", "*.pt")],
+            initialdir="Yolo Models"
+        )
+
+        try: 
+
+            self.model = YOLO(archivo)
+            print(Fore.GREEN + "YOLO model correctly loaded")
+
+        except:
+
+            print(Fore.RED + "Error loading YOLO model")
 
     def connect_drone(self):
 
@@ -140,7 +150,7 @@ class HexsoonController:
 
         self.dron.takeOff(self.take_off_alt)
 
-        time.sleep(10)  # Esperar x segundos a terminar el take off
+        time.sleep(10)
         print("Takeoff completado")
 
         self.take_off_finalizado = True
@@ -307,16 +317,15 @@ class HexsoonController:
             contours, _ = cv2.findContours(
                 dil_frame, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
             )
-            #print(contours)
+
             if contours:
-                #print("Entra en contorno")
+
                 c = max(contours, key=cv2.contourArea)
                 area = cv2.contourArea(c)
 
                 if area > 100:
                     x, y, w, h = cv2.boundingRect(c)
                     object_center = (x + w // 2, y + h // 2)
-                    #print("Entra en area mínima")
                     cv2.rectangle(
                         img_contour, (x, y), (x + w, y + h), (0, 255, 0), 2
                     )
@@ -325,8 +334,7 @@ class HexsoonController:
                     )
 
                     return object_center, img_contour
-            else:
-                print("NO ENTRA EN CONTORNO")
+
             return None, img_contour
 
         # -------------------- NEURAL NETWORK MODE --------------------
@@ -387,7 +395,7 @@ class HexsoonController:
 
             cx, cy = oject_center
             error_x = cx - self.panel_width / 2
-            error_y = self.panel_height / 2 - cy  # Como en este caso la camara no es un espejo así está bien. CAMBIAR si la camara no se cambia de lado
+            error_y = self.panel_height / 2 - cy
 
             derivative_x = error_x - self.prev_error_x
             derivative_y = error_y - self.prev_error_y
@@ -434,7 +442,6 @@ class HexsoonController:
                 self.up_down = 0
 
             if self.take_off_finalizado:
-                # print("Empieza a enviar velocidades")
                 self.integral_x += error_x
                 self.integral_y += error_y
                 self.set_velocity()
