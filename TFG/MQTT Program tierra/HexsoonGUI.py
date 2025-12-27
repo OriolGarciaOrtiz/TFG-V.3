@@ -12,7 +12,13 @@ import queue
 import paho.mqtt.client as mqtt
 import json
 import time
+import folium
+import io
 from colorama import init, Fore
+import requests
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+import os
 
 
 class GUI:
@@ -81,6 +87,7 @@ class GUI:
         self.create_hsv_sliders()
         self.create_pid_controls()
         self.create_velocity_display()
+        self.create_zoom_slider()
 
     def on_message(self, client, userdata, msg):
         if self.controller.camera_option == "Raspi Cam":
@@ -110,8 +117,8 @@ class GUI:
             's_max': self.s_max.get(),
             'v_min': self.v_min.get(),
             'v_max': self.v_max.get(),
-            't1': self.t1.get(),
-            't2': self.t2.get(),
+            'h2_min': self.h2_min.get(),
+            'h2_max': self.h2_max.get(),
 
             # Detection and modes
             'detection_mode': self.detection_var.get(),
@@ -261,8 +268,8 @@ class GUI:
         self.create_pid_slider_set("Y", 250)
 
         Label(self.root, text="Max velocity:", font=("Arial", 12)).grid(row=7, column=3)
-        self.max_velocity = tk.DoubleVar(value=60)
-        velocity_slider = tk.Scale(self.root, from_=0, to=60, resolution=1,
+        self.max_velocity = tk.DoubleVar(value=100)
+        velocity_slider = tk.Scale(self.root, from_=0, to=100, resolution=1,
                                    orient="horizontal", variable=self.max_velocity,
                                    length=200)
         velocity_slider.grid(row=8, column=3)
@@ -296,23 +303,40 @@ class GUI:
         self.h_min, self.h_max = tk.IntVar(value=35), tk.IntVar(value=85)
         self.s_min, self.s_max = tk.IntVar(value=55), tk.IntVar(value=255)
         self.v_min, self.v_max = tk.IntVar(value=100), tk.IntVar(value=255)
-        self.t1, self.t2 = tk.IntVar(value=166), tk.IntVar(value=171)
+        self.h2_min = tk.IntVar(value=160)
+        self.h2_max = tk.IntVar(value=191)
 
         sliders_config = [
-            (self.h_min, "Hue Min:", 1),
-            (self.h_max, "Hue Max:", 2),
-            (self.s_min, "Sat Min:", 3),
-            (self.s_max, "Sat Max:", 4),
-            (self.v_min, "Value Min:", 5),
-            (self.v_max, "Value Max:", 6),
-            (self.t1, "Threshold1", 7),
-            (self.t2, "Threshold2", 8)
+            (self.h_min, "Hue Min 1:", 1),
+            (self.h_max, "Hue Max 1:", 2),
+            (self.h2_min, "Hue Min 2:", 3),
+            (self.h2_max, "Hue Max 2:", 4),
+            (self.s_min, "Sat Min:", 5),
+            (self.s_max, "Sat Max:", 6),
+            (self.v_min, "Value Min:", 7),
+            (self.v_max, "Value Max:", 8),
         ]
 
         for var, text, row in sliders_config:
             Scale(self.root, from_=0, to=255, orient="horizontal",
                   variable=var, length=200).grid(row=row, column=1)
             Label(self.root, text=text, font=("Arial", 12)).grid(row=row, column=0)
+
+    def create_zoom_slider(self): #OJO, nueva función para poder hacer zoom en tiempo real
+        Label(self.root, text="Panoramic Zoom", font=("Arial", 12)).grid(row=9, column=0, padx=10, pady=5)
+
+        self.zoom_var = tk.DoubleVar(value=1.5)
+
+        zoom_slider = tk.Scale(
+            self.root,
+            from_=1.0,
+            to=3.0,
+            resolution=0.1,
+            orient="horizontal",
+            variable=self.zoom_var,
+            length=200
+        )
+        zoom_slider.grid(row=9, column=1, padx=10, pady=5)
 
     def create_velocity_display(self):
         self.lr_label = Label(self.root, text="Left-Right Velocity = 0", font=("Arial", 14))
@@ -426,8 +450,8 @@ class GUI:
         self.controller.s_max = self.s_max.get()
         self.controller.v_min = self.v_min.get()
         self.controller.v_max = self.v_max.get()
-        self.controller.t1 = self.t1.get()
-        self.controller.t2 = self.t2.get()
+        self.controller.h2_min = self.h2_min.get()
+        self.controller.h2_max = self.h2_max.get()
         self.controller.detection_mode = self.detection_var.get()
         self.controller.Kp_x = self.Kp_x.get()
         self.controller.Ki_x = self.Ki_x.get()
@@ -441,6 +465,7 @@ class GUI:
         self.controller.take_off_alt = float(self.takeoff_height.get())
         self.controller.try_mode = self.simulation_var.get()
         self.controller.camera_option = self.camera_option.get()
+        self.controller.zoom_factor = self.zoom_var.get()
 
     def thread_video_func(self):
         """Thread for processing and displaying video frames"""
@@ -536,6 +561,7 @@ class GUI:
 
     def update_velocity_labels(self):
         """Update velocity labels in main thread"""
+
         self.lr_label.config(text=f"Left-Right Velocity = {self.controller.left_right:.2f}")
         self.fb_label.config(text=f"For-Back Velocity = {self.controller.for_back:.2f}")
         self.ud_label.config(text=f"Up-Down Velocity = {self.controller.up_down:.2f}")
@@ -569,7 +595,7 @@ class GUI:
                 print(Fore.RED + f"Frame thread error: {e}")
                 time.sleep(0.1)
 
-    def thread_mission_planner_func(self):
+    def thread_mission_planner_func2(self):
         """Thread for getting Mission Planner frames"""
 
         while self.running:
@@ -587,6 +613,76 @@ class GUI:
             except Exception as e:
                 print(Fore.RED + f"Mission planner thread error: {e}")
                 time.sleep(0.5)
+
+
+    def thread_mission_planner_func(self): #OJO, Nueva función mission planner y maps para modo Practice
+        # Configurar navegador headless
+        chrome_options = Options()
+        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument(f"--window-size={self.misson_panel_width},{self.misson_panel_heigth}")
+        driver = webdriver.Chrome(options=chrome_options)
+
+        tmp_html_path = os.path.join(os.getcwd(), "temp_map.html")
+
+        while self.running:
+            try:
+                mode = self.simulation_var.get()
+
+                if mode == "Simulation":
+                    # Modo Simulation: capturar Mission Planner
+                    mission_frame = self.get_mission_planner_frame()
+                    if mission_frame is not None:
+                        self.mission_frame = mission_frame
+
+                elif mode == "Practice":
+                    dron = self.controller.dron
+                    if dron is not None and dron.lat is not None and dron.lon is not None:
+                        lat = dron.lat
+                        lon = dron.lon
+                        yaw = dron.heading
+                        alt = getattr(dron, "alt", 0)
+
+                        # Generar mapa con folium
+                        m = folium.Map(location=[lat, lon],zoom_start=18,tiles=None)
+
+                        folium.TileLayer(tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",attr="Esri",name="Esri Satellite",overlay=False,control=False).add_to(m)
+
+                        html_icon = f"""
+                        <div style="
+                            transform: rotate({yaw}deg);
+                            width: 40px;
+                            height: 40px;
+                        ">
+                            <img src="DroneMarker.png" style="width:40px;height:40px;">
+                        </div>
+                        """
+
+                        folium.Marker(
+                            [lat, lon],
+                            icon=folium.DivIcon(html=html_icon),
+                            popup=f"ALT: {alt:.1f} m<br>YAW: {yaw:.1f}°"
+                        ).add_to(m)
+
+                        m.save(tmp_html_path)
+
+                        # Renderizar HTML a imagen con Selenium
+                        driver.get("file:///" + tmp_html_path.replace("\\", "/"))
+                        png = driver.get_screenshot_as_png()
+
+                        # Convertir a numpy array para OpenCV
+                        img = Image.open(io.BytesIO(png))
+                        mission_frame = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+
+                        self.mission_frame = mission_frame
+
+                time.sleep(0.5)
+
+            except Exception as e:
+                print(f"Mission planner / Map thread error: {e}")
+                time.sleep(0.5)
+
+        driver.quit()
 
     def update_frame(self):
         try:

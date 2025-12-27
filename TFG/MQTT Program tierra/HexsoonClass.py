@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 from pymavlink import mavutil
 from dronLink.modules.dron_move import _prepare_command_mov
+from dronLink.modules.dron_RC_override import send_rc
 import base64
 from colorama import init, Fore
 import threading
@@ -22,6 +23,7 @@ class HexsoonController:
 
         init(autoreset=True)
 
+        self.detected_color = None
         self.model = None
 
         self.panel_width = 320
@@ -29,13 +31,16 @@ class HexsoonController:
 
         self.h_min = 0
         self.h_max = 179
+        self.h2_min = 160
+        self.h2_max = 191
         self.s_min = 0
         self.s_max = 255
         self.v_min = 0
         self.v_max = 255
+        self.zoom_factor = 1.5
 
-        self.t1 = 0
-        self.t2 = 255
+        self.t1 = 166
+        self.t2 = 171
 
         self.detection_mode = "Color Contour"
 
@@ -111,6 +116,7 @@ class HexsoonController:
 
             print(Fore.RED + "Error loading YOLO model")
 
+
     def connect_drone(self):
 
         self.click_connect = True
@@ -171,21 +177,43 @@ class HexsoonController:
         if self.is_connected:
             self.dron.arm()
 
-    def set_velocity(self):
 
+
+    def set_velocity(self): #OJO, cambios
         if not self.take_off_finalizado:
             return
-
         vehicle: mavutil.mavfile = getattr(self.dron, 'vehicle', None)
         if vehicle is None:
             return
+        if self.detection_mode == "Color Contour" and self.view_mode == "Front View":
+            if self.detected_color == "color1":
 
-        step_x = self.for_back / 100.0
-        step_y = self.left_right / 100.0
-        step_z = -self.up_down / 100.0
+                step_x = self.for_back / 100.0
+                step_y = self.left_right / 100.0
+                step_z = 0  # OJO, lo pongo todo a cero por si acaso que a veces se movia el dron
+                msg = _prepare_command_mov(self.dron, step_x, step_y, step_z, bodyRef=True)
+                vehicle.mav.send(msg)
 
-        msg = _prepare_command_mov(self.dron, step_x, step_y, step_z, bodyRef=True)
-        vehicle.mav.send(msg)
+            elif self.detected_color == "color2":
+
+                yaw_input = self.yaw / 100.0  # Valores entre -1 y 1 porque velocityx solo puede ir entre -100 a 100
+                yaw_pwm = 1500 + int(
+                    yaw_input * 150)  # Para que la velocidad no sea super alta le ponemos un límite de +-150 porque si queremos usar los mismos Kp,Ki,Kd que los de left right el yaw se mueve demasiado según las pruebas que he hecho en simulación
+                yaw_pwm = max(1100, min(1900,
+                                        yaw_pwm))  # Para tenerlo aún más seguro hay que poner esto ya que el rango válido de RC en Arducopter es 1100-1900. Si le das más o menos puede ser peligroso pra el equilibrio
+                send_rc(self.dron, 1500, 1500, 1500,
+                        yaw_pwm)  # Ponemos todo a 1500 que es para que se mentanega a la misma altura
+                # Para poner bien las labels:
+
+        elif self.detection_mode == "Neural Network" and self.view_mode == "Bottom View":
+            step_x = self.for_back / 100.0
+            step_y = self.left_right / 100.0
+            step_z = 0  # OJO, lo pongo todo a cero por si acaso que a veces se movia el dron
+            msg = _prepare_command_mov(self.dron, step_x, step_y, step_z, bodyRef=True)
+            vehicle.mav.send(msg)
+        else:
+            msg = _prepare_command_mov(self.dron, 0, 0, 0, bodyRef=True)
+            vehicle.mav.send(msg)
 
     def base64_to_image(self, b64_string):
         if b64_string is None:
@@ -267,7 +295,7 @@ class HexsoonController:
                 dst = u_img[y:y + h, x:x + w]
                 dst = cv2.flip(dst, 1)
 
-                dst = self.zoom_frame(dst, zoom_factor=1.5)
+                dst = self.zoom_frame(dst, zoom_factor=self.zoom_factor)
 
                 return self.get_detected_frame(dst)
 
@@ -310,28 +338,35 @@ class HexsoonController:
                 with self.yolo_lock:
                     self.yolo_result = (None, [])
 
-    def get_object_center(self, dil_frame, img_contour):
+    def get_object_center(self, dil_frame, img_contour): #OJO, cambios
 
-        # -------------------- COLOR CONTOUR MODE --------------------
         if self.detection_mode == "Color Contour":
             contours, _ = cv2.findContours(
                 dil_frame, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
             )
 
             if contours:
-
                 c = max(contours, key=cv2.contourArea)
                 area = cv2.contourArea(c)
 
                 if area > 100:
                     x, y, w, h = cv2.boundingRect(c)
                     object_center = (x + w // 2, y + h // 2)
-                    cv2.rectangle(
-                        img_contour, (x, y), (x + w, y + h), (0, 255, 0), 2
-                    )
-                    cv2.circle(
-                        img_contour, object_center, 5, (255, 0, 0), cv2.FILLED
-                    )
+
+                    # -------------------- Selección de color --------------------
+                    if self.detected_color == "color1":
+                        rect_color = (0, 255, 0)  # Verde
+                        circle_color = (255, 0, 0)  # Azul
+                    elif self.detected_color == "color2":
+                        rect_color = (0, 0, 255)  # Rojo
+                        circle_color = (0, 255, 255)  # Amarillo
+                    else:
+                        rect_color = (255, 255, 255)  # Blanco por defecto
+                        circle_color = (255, 255, 255)
+
+                    # Dibujar rectángulo y círculo
+                    cv2.rectangle(img_contour, (x, y), (x + w, y + h), rect_color, 2)
+                    cv2.circle(img_contour, object_center, 5, circle_color, cv2.FILLED)
 
                     return object_center, img_contour
 
@@ -385,7 +420,7 @@ class HexsoonController:
             )
             return None, img_contour
 
-    def get_velocities(self, oject_center):
+    def get_velocities(self, oject_center): #OJO, modificado
 
         '''
             Returns the camputed velocities to be sent to the simulator.
@@ -394,11 +429,13 @@ class HexsoonController:
         if oject_center is not None:
 
             cx, cy = oject_center
-            error_x = cx - self.panel_width / 2
+            error_x = self.panel_width / 2 -cx #Cambiado. Mirar si en bottom view tiene que ser tambien así o hay que cambiarlo
             error_y = self.panel_height / 2 - cy
 
             derivative_x = error_x - self.prev_error_x
             derivative_y = error_y - self.prev_error_y
+            self.prev_error_x = error_x #OJO, hay que guardarse el anterior y no lo habíamos hecho
+            self.prev_error_y = error_y
 
             if self.PID_mode == "P":
                 velocity_x = self.Kp_x * error_x
@@ -425,21 +462,35 @@ class HexsoonController:
                 velocity_y = (self.Kp_y * error_y) + (self.Ki_y * self.integral_y) + (self.Kd_y * derivative_y)
 
             else:
-                velocity_x = error_x
-                velocity_y = error_y
+                velocity_x = 0
+                velocity_y = 0
 
             velocity_x = int(np.clip(velocity_x, -self.max_velocity, self.max_velocity))
             velocity_y = int(np.clip(velocity_y, -self.max_velocity, self.max_velocity))
 
-            if self.view_mode == "Front View":
-                self.left_right = velocity_x
-                self.up_down = velocity_y
+            if self.view_mode == "Front View" and self.detection_mode == "Color Contour":
+                if self.detected_color == "color1":
+                    # Movimiento lateral
+                    self.left_right = velocity_x
+                    self.yaw = 0
+
+                elif self.detected_color == "color2":
+                    # Giro en yaw
+                    self.left_right = 0
+                    self.yaw = velocity_x
+
+                else:
+                    self.left_right = 0
+                    self.yaw = 0
+
                 self.for_back = 0
+                self.up_down = 0
 
             else:
                 self.left_right = velocity_x
                 self.for_back = velocity_y
                 self.up_down = 0
+                self.yaw = 0
 
             if self.take_off_finalizado:
                 self.integral_x += error_x
@@ -461,23 +512,54 @@ class HexsoonController:
         frame_display = cv2.resize(frame, (self.panel_width, self.panel_height))
         frame_hsv = cv2.cvtColor(frame_display, cv2.COLOR_BGR2HSV)
 
-        lower = np.array([self.h_min, self.s_min, self.v_min])
-        upper = np.array([self.h_max, self.s_max, self.v_max])
+        # -------- COLOR 1 -------- De momento lo tengo como color verde
+        lower1 = np.array([self.h_min, self.s_min, self.v_min])
+        upper1 = np.array([self.h_max, self.s_max, self.v_max])
+        mask1 = cv2.inRange(frame_hsv, lower1, upper1)
 
-        mask = cv2.inRange(frame_hsv, lower, upper)
+        # -------- COLOR 2 -------- De momento lo tengo como color rojo
+        lower2 = np.array([self.h2_min, 137, self.v_min])
+        upper2 = np.array([self.h2_max, self.s_max, self.v_max])
+        mask2 = cv2.inRange(frame_hsv, lower2, upper2)
+
+        kernel = np.ones((5, 5), np.uint8)
+        mask1 = cv2.dilate(mask1, kernel, iterations=1)
+        mask2 = cv2.dilate(mask2, kernel, iterations=1)
+
+        # -------- SELECCIÓN DEL COLOR DOMINANTE --------
+        def max_area(mask):
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if not contours:
+                return 0
+            return max(cv2.contourArea(c) for c in contours)
+
+        area1 = max_area(mask1)
+        area2 = max_area(mask2)
+
+        if area1 > 100 and area1 >= area2:
+            mask = mask1
+            self.detected_color = "color1"
+        elif area2 > 100:
+            mask = mask2
+            self.detected_color = "color2"
+        else:
+            mask = np.zeros_like(mask1)
+            self.detected_color = None
+
+        # -------- PIPELINE ORIGINAL --------
         result = cv2.bitwise_and(frame_display, frame_display, mask=mask)
 
         img_blur = cv2.GaussianBlur(result, (7, 7), 1)
         img_grey = cv2.cvtColor(img_blur, cv2.COLOR_BGR2GRAY)
         img_canny = cv2.Canny(img_grey, self.t1, self.t2)
-        kernel = np.ones((5, 5), np.uint8)
         img_dilated = cv2.dilate(img_canny, kernel, iterations=1)
-
-        ''''''
 
         img_contour = frame_display.copy()
 
         object_center, img_contour = self.get_object_center(img_dilated, img_contour)
+
+        # DEBUG VISUAL (opcional pero útil)
+        cv2.putText(img_contour,f"COLOR: {self.detected_color}",(10, 20),cv2.FONT_HERSHEY_SIMPLEX,0.6,(0, 255, 0) if self.detected_color == "color1" else (255, 0, 0),2,)
 
         self.get_velocities(object_center)
 

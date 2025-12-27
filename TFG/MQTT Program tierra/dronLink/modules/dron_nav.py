@@ -67,6 +67,8 @@ def _prepare_command(self, velocity_x, velocity_y, velocity_z, bodyRef = False):
     return msg
 
 
+
+
 def _goingTread(self):
     self.cmd = self._prepare_command(0, 0, 0)
     while self.going:
@@ -100,6 +102,9 @@ def unfixHeading (self):
                                                         param_value=1, param_type=dialect.MAV_PARAM_TYPE_REAL32)
     self.vehicle.mav.send(message)
 
+
+
+
 def _changeHeading (self, absoluteDegrees, callback=None, params = None):
     # para cambiar el heading en necesario detener el modo navegación
     self._stopGo()
@@ -115,11 +120,13 @@ def _changeHeading (self, absoluteDegrees, callback=None, params = None):
         0, 0, 0, 0) # not used
 
     # espero hasta que haya alcanzado la orientación indicada
-    msg = self.message_handler.wait_for_message(
-        'GLOBAL_POSITION_INT',
-        condition = self._checkHeadingReached,
-        params = absoluteDegrees
-    )
+    # msg = self.message_handler.wait_for_message(
+    #     'GLOBAL_POSITION_INT',
+    #     condition = self._checkHeadingReached,
+    #     params = absoluteDegrees
+    # )
+
+
     '''while True:
         msg = self.message_handler.wait_for_message('GLOBAL_POSITION_INT', timeout=3)
         if msg:
