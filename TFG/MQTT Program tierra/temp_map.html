@@ -17,7 +17,7 @@
             <meta name="viewport" content="width=device-width,
                 initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <style>
-                #map_b5b5b573caa8918f893126fddedbb926 {
+                #map_a04a5599d53d06a733f36ad440370c1b {
                     position: relative;
                     width: 100.0%;
                     height: 100.0%;
@@ -54,16 +54,43 @@
 <body>
     
     
-            <div class="folium-map" id="map_b5b5b573caa8918f893126fddedbb926" ></div>
+                        <style>
+                        html, body {
+                            width: 100%;
+                            height: 100%;
+                            margin: 0;
+                            padding: 0;
+                        }
+                        #map {
+                            position: absolute;
+                            top: 0;
+                            bottom: 0;
+                            width: 100%;
+                            height: 100%;
+                        }
+                        .leaflet-tile {
+                            filter: brightness(1) contrast(1) !important;
+                            opacity: 1 !important;
+                        }
+                        .leaflet-fade-anim .leaflet-tile {
+                            transition: none !important;
+                        }
+                        .leaflet-container {
+                            background: black !important;
+                        }
+                        </style>
+                        
+    
+            <div class="folium-map" id="map_a04a5599d53d06a733f36ad440370c1b" ></div>
         
 </body>
 <script>
     
     
-            var map_b5b5b573caa8918f893126fddedbb926 = L.map(
-                "map_b5b5b573caa8918f893126fddedbb926",
+            var map_a04a5599d53d06a733f36ad440370c1b = L.map(
+                "map_a04a5599d53d06a733f36ad440370c1b",
                 {
-                    center: [41.2762698, 1.9880579],
+                    center: [41.2762848, 1.9883055],
                     crs: L.CRS.EPSG3857,
                     ...{
   "zoom": 18,
@@ -78,7 +105,7 @@
 
         
     
-            var tile_layer_e4af425121ee033ecbe280bbdf9cef1b = L.tileLayer(
+            var tile_layer_8767b00a29cfe37bc8b3931d454247f3 = L.tileLayer(
                 "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
                 {
   "minZoom": 0,
@@ -95,40 +122,48 @@
             );
         
     
-            tile_layer_e4af425121ee033ecbe280bbdf9cef1b.addTo(map_b5b5b573caa8918f893126fddedbb926);
+            tile_layer_8767b00a29cfe37bc8b3931d454247f3.addTo(map_a04a5599d53d06a733f36ad440370c1b);
         
     
-            var marker_19b994de903b92fa0dcd9c07eacd065c = L.marker(
-                [41.2762698, 1.9880579],
+            var marker_6f6c9d37a82af6810654789e73d3e62e = L.marker(
+                [41.2762848, 1.9883055],
                 {
 }
-            ).addTo(map_b5b5b573caa8918f893126fddedbb926);
+            ).addTo(map_a04a5599d53d06a733f36ad440370c1b);
         
     
-            var div_icon_0059de4a7d80a126e3307ea74ac37fbd = L.divIcon({
-  "html": "\n                        \u003cdiv style=\"\n                            transform: rotate(231.89deg);\n                            width: 40px;\n                            height: 40px;\n                        \"\u003e\n                            \u003cimg src=\"DroneMarker.png\" style=\"width:40px;height:40px;\"\u003e\n                        \u003c/div\u003e\n                        ",
+            var div_icon_189922c689c3242bf9f41db7d5a8765a = L.divIcon({
+  "html": "\n                        \u003cdiv style=\"\n                            width: 40px;\n                            height: 40px;\n                            transform: rotate(293.0deg);\n                            transform-origin: 50% 50%;\n                            pointer-events: none;\n                        \"\u003e\n                            \u003cimg src=\"DroneMarker2.png\"\n                                 style=\"width:40px; height:40px;\"\u003e\n                        \u003c/div\u003e\n                        ",
+  "iconSize": [40, 40],
+  "iconAnchor": [20, 20],
   "className": "empty",
 });
         
     
-        var popup_b64d00a013a138ad05a06b91d61bb907 = L.popup({
+        var popup_2e891a25dda9b84259f23b339252d757 = L.popup({
   "maxWidth": "100%",
 });
 
         
             
-                var html_8dc05df4671cb208f92c738ec800616b = $(`<div id="html_8dc05df4671cb208f92c738ec800616b" style="width: 100.0%; height: 100.0%;">ALT: 1.8 m<br>YAW: 231.9°</div>`)[0];
-                popup_b64d00a013a138ad05a06b91d61bb907.setContent(html_8dc05df4671cb208f92c738ec800616b);
+                var html_d45364574ea5ddd2f8ffa46a96fcedd4 = $(`<div id="html_d45364574ea5ddd2f8ffa46a96fcedd4" style="width: 100.0%; height: 100.0%;">ALT: 2.0 m<br>YAW: 293.0°</div>`)[0];
+                popup_2e891a25dda9b84259f23b339252d757.setContent(html_d45364574ea5ddd2f8ffa46a96fcedd4);
             
         
 
-        marker_19b994de903b92fa0dcd9c07eacd065c.bindPopup(popup_b64d00a013a138ad05a06b91d61bb907)
+        marker_6f6c9d37a82af6810654789e73d3e62e.bindPopup(popup_2e891a25dda9b84259f23b339252d757)
         ;
 
         
     
     
-                marker_19b994de903b92fa0dcd9c07eacd065c.setIcon(div_icon_0059de4a7d80a126e3307ea74ac37fbd);
+                marker_6f6c9d37a82af6810654789e73d3e62e.setIcon(div_icon_189922c689c3242bf9f41db7d5a8765a);
             
+    
+            var poly_line_9b4b67d3e218dd7473ba308c9bebfd9b = L.polyline(
+                [[41.2762848, 1.9883055], [41.27633744972087, 1.9881404583209819]],
+                {"bubblingMouseEvents": true, "color": "red", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "red", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 1.0, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_a04a5599d53d06a733f36ad440370c1b);
+        
 </script>
 </html>

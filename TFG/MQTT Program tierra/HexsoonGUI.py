@@ -15,9 +15,12 @@ import time
 import folium
 import io
 from colorama import init, Fore
-import requests
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import math
 import os
 
 
@@ -614,8 +617,7 @@ class GUI:
                 print(Fore.RED + f"Mission planner thread error: {e}")
                 time.sleep(0.5)
 
-
-    def thread_mission_planner_func(self): #OJO, Nueva función mission planner y maps para modo Practice
+    def thread_mission_planner_func(self):  # OJO, Nueva función mission planner y maps para modo Practice
         # Configurar navegador headless
         chrome_options = Options()
         chrome_options.add_argument("--headless")
@@ -630,7 +632,7 @@ class GUI:
                 mode = self.simulation_var.get()
 
                 if mode == "Simulation":
-                    # Modo Simulation: capturar Mission Planner
+                    # Modo Practice: capturar Mission Planner real
                     mission_frame = self.get_mission_planner_frame()
                     if mission_frame is not None:
                         self.mission_frame = mission_frame
@@ -643,34 +645,110 @@ class GUI:
                         yaw = dron.heading
                         alt = getattr(dron, "alt", 0)
 
-                        # Generar mapa con folium
-                        m = folium.Map(location=[lat, lon],zoom_start=18,tiles=None)
+                        # Crear mapa folium (SATELITE)
+                        m = folium.Map(
+                            location=[lat, lon],
+                            zoom_start=18,
+                            tiles=None
+                        )
 
-                        folium.TileLayer(tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",attr="Esri",name="Esri Satellite",overlay=False,control=False).add_to(m)
+                        folium.TileLayer(
+                            tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                            attr="Esri",
+                            name="Esri Satellite",
+                            overlay=False,
+                            control=False
+                        ).add_to(m)
+
+                        # --- CSS CRÍTICO ---
+                        m.get_root().html.add_child(folium.Element("""
+                        <style>
+                        html, body {
+                            width: 100%;
+                            height: 100%;
+                            margin: 0;
+                            padding: 0;
+                        }
+                        #map {
+                            position: absolute;
+                            top: 0;
+                            bottom: 0;
+                            width: 100%;
+                            height: 100%;
+                        }
+                        .leaflet-tile {
+                            filter: brightness(1) contrast(1) !important;
+                            opacity: 1 !important;
+                        }
+                        .leaflet-fade-anim .leaflet-tile {
+                            transition: none !important;
+                        }
+                        .leaflet-container {
+                            background: black !important;
+                        }
+                        </style>
+                        """))
+
+                        # -------- ICONO DEL DRON (CENTRADO CORRECTAMENTE) --------
+                        icon_size = 40
+                        icon_anchor = icon_size // 2
 
                         html_icon = f"""
                         <div style="
+                            width: {icon_size}px;
+                            height: {icon_size}px;
                             transform: rotate({yaw}deg);
-                            width: 40px;
-                            height: 40px;
+                            transform-origin: 50% 50%;
+                            pointer-events: none;
                         ">
-                            <img src="DroneMarker.png" style="width:40px;height:40px;">
+                            <img src="DroneMarker2.png"
+                                 style="width:{icon_size}px; height:{icon_size}px;">
                         </div>
                         """
 
                         folium.Marker(
                             [lat, lon],
-                            icon=folium.DivIcon(html=html_icon),
+                            icon=folium.DivIcon(
+                                html=html_icon,
+                                icon_size=(icon_size, icon_size),
+                                icon_anchor=(icon_anchor, icon_anchor)
+                            ),
                             popup=f"ALT: {alt:.1f} m<br>YAW: {yaw:.1f}°"
                         ).add_to(m)
 
+                        # -------- VECTOR DE ORIENTACIÓN (LÍNEA ROJA) --------
+                        line_length = 15  # metros aprox
+                        yaw_rad = math.radians(yaw)
+
+                        dlat = (line_length * math.cos(yaw_rad)) / 111320
+                        dlon = (line_length * math.sin(yaw_rad)) / (111320 * math.cos(math.radians(lat)))
+
+                        lat_front = lat + dlat
+                        lon_front = lon + dlon
+
+                        folium.PolyLine(
+                            locations=[
+                                [lat, lon],
+                                [lat_front, lon_front]
+                            ],
+                            color="red",
+                            weight=3,
+                            opacity=1.0
+                        ).add_to(m)
+
+                        # Guardar HTML
                         m.save(tmp_html_path)
 
                         # Renderizar HTML a imagen con Selenium
                         driver.get("file:///" + tmp_html_path.replace("\\", "/"))
-                        png = driver.get_screenshot_as_png()
+                        time.sleep(1.0)
 
-                        # Convertir a numpy array para OpenCV
+                        map_div = WebDriverWait(driver, 5).until(
+                            EC.presence_of_element_located((By.CLASS_NAME, "folium-map"))
+                        )
+
+                        png = map_div.screenshot_as_png
+
                         img = Image.open(io.BytesIO(png))
                         mission_frame = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
 
