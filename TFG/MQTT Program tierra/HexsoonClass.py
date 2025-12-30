@@ -103,7 +103,6 @@ class HexsoonController:
 
         archivo = filedialog.askopenfilename(
             title="Seleccionar archivo",
-            filetypes=[("Models Yolo", "*.pt")],
             initialdir="Yolo Models"
         )
 
@@ -185,25 +184,32 @@ class HexsoonController:
         vehicle: mavutil.mavfile = getattr(self.dron, 'vehicle', None)
         if vehicle is None:
             return
-        if self.detection_mode == "Color Contour" and self.view_mode == "Front View":
-            if self.detected_color == "color1":
+        if self.detection_mode == "Color Contour":
+            if self.view_mode == "Front View":
+                if self.detected_color == "color1":
 
+                    step_x = self.for_back / 100.0
+                    step_y = self.left_right / 100.0
+                    step_z = 0  # OJO, lo pongo todo a cero por si acaso que a veces se movia el dron
+                    msg = _prepare_command_mov(self.dron, step_x, step_y, step_z, bodyRef=True)
+                    vehicle.mav.send(msg)
+
+                elif self.detected_color == "color2":
+
+                    yaw_input = self.yaw / 100.0  # Valores entre -1 y 1 porque velocityx solo puede ir entre -100 a 100
+                    yaw_pwm = 1500 + int(
+                        yaw_input * 150)  # Para que la velocidad no sea super alta le ponemos un límite de +-150 porque si queremos usar los mismos Kp,Ki,Kd que los de left right el yaw se mueve demasiado según las pruebas que he hecho en simulación
+                    yaw_pwm = max(1100, min(1900,
+                                            yaw_pwm))  # Para tenerlo aún más seguro hay que poner esto ya que el rango válido de RC en Arducopter es 1100-1900. Si le das más o menos puede ser peligroso pra el equilibrio
+                    send_rc(self.dron, 1500, 1500, 1500,
+                            yaw_pwm)  # Ponemos todo a 1500 que es para que se mentanega a la misma altura
+                    # Para poner bien las labels:
+            else:
                 step_x = self.for_back / 100.0
                 step_y = self.left_right / 100.0
                 step_z = 0  # OJO, lo pongo todo a cero por si acaso que a veces se movia el dron
                 msg = _prepare_command_mov(self.dron, step_x, step_y, step_z, bodyRef=True)
                 vehicle.mav.send(msg)
-
-            elif self.detected_color == "color2":
-
-                yaw_input = self.yaw / 100.0  # Valores entre -1 y 1 porque velocityx solo puede ir entre -100 a 100
-                yaw_pwm = 1500 + int(
-                    yaw_input * 150)  # Para que la velocidad no sea super alta le ponemos un límite de +-150 porque si queremos usar los mismos Kp,Ki,Kd que los de left right el yaw se mueve demasiado según las pruebas que he hecho en simulación
-                yaw_pwm = max(1100, min(1900,
-                                        yaw_pwm))  # Para tenerlo aún más seguro hay que poner esto ya que el rango válido de RC en Arducopter es 1100-1900. Si le das más o menos puede ser peligroso pra el equilibrio
-                send_rc(self.dron, 1500, 1500, 1500,
-                        yaw_pwm)  # Ponemos todo a 1500 que es para que se mentanega a la misma altura
-                # Para poner bien las labels:
 
         elif self.detection_mode == "Neural Network" and self.view_mode == "Bottom View":
             step_x = self.for_back / 100.0

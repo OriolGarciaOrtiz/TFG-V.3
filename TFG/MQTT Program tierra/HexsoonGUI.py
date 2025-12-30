@@ -333,7 +333,7 @@ class GUI:
         zoom_slider = tk.Scale(
             self.root,
             from_=1.0,
-            to=3.0,
+            to=20,
             resolution=0.1,
             orient="horizontal",
             variable=self.zoom_var,

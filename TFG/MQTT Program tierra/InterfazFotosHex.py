@@ -33,7 +33,7 @@ class App:
         # Parámetros
         self.panel_width = 320
         self.panel_height = 240
-        self.capture_interval = 1.0  # segundos entre fotos
+        self.capture_interval = 0.25  # segundos entre fotos
 
         # Cámara
         self.cap = None
@@ -147,7 +147,7 @@ class App:
 
     def capture_images(self):
         i = 1
-        while i <= 300:
+        while i <= 600:
             if self.pause_capture:
                 time.sleep(0.1)
                 continue
