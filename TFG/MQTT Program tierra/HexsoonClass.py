@@ -30,7 +30,7 @@ class HexsoonController:
         self.panel_height = 240
 
         self.colors: dict | None = None
-        
+
         self.zoom_factor = 1.5
 
         self.t1 = 166
@@ -341,6 +341,20 @@ class HexsoonController:
                 with self.yolo_lock:
                     self.yolo_result = (None, [])
 
+    def hsv_to_rgb(hsv_lower, hsv_upper):
+        """
+        Take an HSV range (lower or upper), returns an approximate RGB color.
+        Uses the middle value of the HSV range for conversion.
+        """
+        h = int((hsv_lower[0] + hsv_upper[0]) / 2)
+        s = int((hsv_lower[1] + hsv_upper[1]) / 2)
+        v = int((hsv_lower[2] + hsv_upper[2]) / 2)
+        
+        hsv_pixel = np.uint8([[[h, s, v]]])
+        rgb_pixel = cv2.cvtColor(hsv_pixel, cv2.COLOR_HSV2BGR)  # OpenCV returns BGR
+        b, g, r = rgb_pixel[0, 0]  # unpack BGR
+        return (r, g, b)
+
     def get_object_center(self, dil_frame, img_contour): #OJO, cambios
 
         if self.detection_mode == "Color Contour":
@@ -517,12 +531,12 @@ class HexsoonController:
 
         c1, c2 = self.colors["primary"], self.colors["secondary"]
 
-        # -------- COLOR 1 -------- De momento lo tengo como color verde
+        # -------- COLOR 1 --------
         lower1 = np.array(c1[0])
         upper1 = np.array(c1[1])
         mask1 = cv2.inRange(frame_hsv, lower1, upper1)
 
-        # -------- COLOR 2 -------- De momento lo tengo como color rojo
+        # -------- COLOR 2 --------
         lower2 = np.array(c2[0])
         upper2 = np.array(c2[1])
         mask2 = cv2.inRange(frame_hsv, lower2, upper2)

@@ -204,7 +204,7 @@ class GUI:
             "Green":  (35, 85, 55, 255, 100, 255),
             "Pink":   (140, 170, 20, 255, 100, 255),
             "Blue":   (85, 135, 100, 255, 100, 255),
-            "Oranje": (5, 25, 150, 255, 150, 255),
+            "Oranje": (0, 30, 160, 255, 100, 255),         # 0, 10, 90, 255, 100, 255
             "Yellow": (25, 45, 200, 255, 200, 255),
         }
         values = presets.get(preset)
@@ -230,16 +230,15 @@ class GUI:
             "v_min": vmin, "v_max": vmax
         }
 
-    def switch_color(self, *args):
-        # Get the selected color slot
-        selected = self.color_sel.get()  # "Color 1" or "Color 2"
-        
-        # Get stored values for this color slot
+    def switch_color(self, *_):
+        selected = self.color_sel.get()
         values = self.color_values.get(selected)
         if not values:
             return
 
-        # Update sliders to stored HSV
+        self.updating_sliders = True  # Block slider callback
+
+        # Restore last slider values for this color
         self.h_min.set(values["h_min"])
         self.h_max.set(values["h_max"])
         self.s_min.set(values["s_min"])
@@ -247,9 +246,10 @@ class GUI:
         self.v_min.set(values["v_min"])
         self.v_max.set(values["v_max"])
 
-        # Update preset dropdown to stored preset
+        # Restore preset dropdown
         self.color_opt.set(values.get("preset", "Green"))
 
+        self.updating_sliders = False  # Re-enable slider callback
 
     def create_control_buttons(self):
         self.color_opt = tk.StringVar(value="Green")
@@ -375,18 +375,34 @@ class GUI:
         self.v_min, self.v_max = tk.IntVar(value=100), tk.IntVar(value=255)
 
         sliders_config = [
-            (self.h_min, "Hue Min 1:", 1),
-            (self.h_max, "Hue Max 1:", 2),
-            (self.s_min, "Sat Min:", 3),
-            (self.s_max, "Sat Max:", 4),
-            (self.v_min, "Value Min:", 5),
-            (self.v_max, "Value Max:", 6),
+            (self.h_min, "Hue Min 1:"),
+            (self.h_max, "Hue Max 1:"),
+            (self.s_min, "Sat Min:"),
+            (self.s_max, "Sat Max:"),
+            (self.v_min, "Value Min:"),
+            (self.v_max, "Value Max:"),
         ]
 
-        for var, text, row in sliders_config:
-            Scale(self.root, from_=0, to=255, orient="horizontal",
-                  variable=var, length=200).grid(row=row, column=1)
-            Label(self.root, text=text, font=("Arial", 12)).grid(row=row, column=0)
+        for i, (var, text) in enumerate(sliders_config):
+            def on_slide(v, var=var, text=text):
+                current_color = self.color_sel.get()
+                key_base = text.split()[0].lower()  # 'hue', 'sat', 'value'
+                key_suffix = "_min" if "Min" in text else "_max"
+                key = key_base[0] + key_suffix  # e.g., 'h_min'
+                self.color_values[current_color][key] = int(float(v))
+
+            slider = tk.Scale(
+                self.root,
+                from_=0, to=255,
+                orient="horizontal",
+                variable=var,
+                length=200,
+                command=on_slide
+            )
+            slider.grid(row=i + 1, column=1)
+
+            Label(self.root, text=text, font=("Arial", 12)).grid(row=i + 1, column=0)
+
 
     def create_zoom_slider(self): #OJO, nueva función para poder hacer zoom en tiempo real
         Label(self.root, text="Panoramic Zoom", font=("Arial", 12)).grid(row=9, column=0, padx=10, pady=5)
