@@ -66,6 +66,11 @@ class GUI:
         self.clock_start = time.monotonic()  # Initialize timer
         self.send_interval = 0.5  # Send every 0.5 seconds
 
+        self.color_values = {
+            "Color 1": {"preset": "Green", "h_min": 35, "h_max": 85, "s_min": 55, "s_max": 255, "v_min": 100, "v_max": 255},
+            "Color 2": {"preset": "Blue",  "h_min": 85, "h_max": 135, "s_min": 100, "s_max": 255, "v_min": 100, "v_max": 255},
+        }
+
         # Start threads
         self.thread_video = threading.Thread(target=self.thread_video_func, daemon=True)
         self.thread_velocities = threading.Thread(target=self.thread_velocities_func, daemon=True)
@@ -192,15 +197,77 @@ class GUI:
 
         self.battery_label = Label(self.root, text="Battery: -", font=("Arial", 14))
         self.battery_label.grid(row=0, column=2, padx=10, pady=10)
+    
+    def apply_color_preset(self, *args):
+        preset = self.color_opt.get()
+        presets = {
+            "Green":  (35, 85, 55, 255, 100, 255),
+            "Pink":   (140, 170, 20, 255, 100, 255),
+            "Blue":   (85, 135, 100, 255, 100, 255),
+            "Oranje": (5, 25, 150, 255, 150, 255),
+            "Yellow": (25, 45, 200, 255, 200, 255),
+        }
+        values = presets.get(preset)
+        if not values:
+            return
+
+        hmin, hmax, smin, smax, vmin, vmax = values
+
+        # Update sliders directly
+        self.h_min.set(hmin)
+        self.h_max.set(hmax)
+        self.s_min.set(smin)
+        self.s_max.set(smax)
+        self.v_min.set(vmin)
+        self.v_max.set(vmax)
+
+        # Update the currently selected color values
+        current_color = self.color_sel.get()  # "Color 1" or "Color 2"
+        self.color_values[current_color] = {
+            "preset": preset,
+            "h_min": hmin, "h_max": hmax,
+            "s_min": smin, "s_max": smax,
+            "v_min": vmin, "v_max": vmax
+        }
+
+    def switch_color(self, *args):
+        # Get the selected color slot
+        selected = self.color_sel.get()  # "Color 1" or "Color 2"
+        
+        # Get stored values for this color slot
+        values = self.color_values.get(selected)
+        if not values:
+            return
+
+        # Update sliders to stored HSV
+        self.h_min.set(values["h_min"])
+        self.h_max.set(values["h_max"])
+        self.s_min.set(values["s_min"])
+        self.s_max.set(values["s_max"])
+        self.v_min.set(values["v_min"])
+        self.v_max.set(values["v_max"])
+
+        # Update preset dropdown to stored preset
+        self.color_opt.set(values.get("preset", "Green"))
+
 
     def create_control_buttons(self):
-        # Arm Button - use controller.arm directly
-        # self.arm_button = tk.Button(self.root, text="Arm", command=lambda: self.run_in_thread(self.controller.arm_drone))
-        # self.arm_button.grid(column=4, row=1, padx=10, pady=10)
+        self.color_opt = tk.StringVar(value="Green")
+        color_menu = tk.OptionMenu(self.root, self.color_opt,
+                                            "Green", "Pink", "Blue", "Oranje", "Yellow")
+        color_menu.grid(row=7, column=1, padx=10, pady=10)
+
+        self.color_sel = tk.StringVar(value="Color 1")
+        color_selection = tk.OptionMenu(self.root, self.color_sel,
+                                            "Color 1", "Color 2")
+        color_selection.grid(row=7, column=0, padx=10, pady=10)
+
+        self.color_opt.trace_add("write", self.apply_color_preset)
+        self.color_sel.trace_add("write", self.switch_color)
 
         self.takeoff_height = tk.Entry(self.root, width=10)
         self.takeoff_height.insert(0, "2")
-        self.takeoff_height.grid(column=2, row=1, padx=10, pady=10)
+        self.takeoff_height.grid(column=4, row=1, padx=10, pady=10)
 
         # Take off button - use controller.take_off_drone directly
         self.take_off_button = tk.Button(self.root, text="Arm and Take-off",
@@ -306,18 +373,14 @@ class GUI:
         self.h_min, self.h_max = tk.IntVar(value=35), tk.IntVar(value=85)
         self.s_min, self.s_max = tk.IntVar(value=55), tk.IntVar(value=255)
         self.v_min, self.v_max = tk.IntVar(value=100), tk.IntVar(value=255)
-        self.h2_min = tk.IntVar(value=160)
-        self.h2_max = tk.IntVar(value=191)
 
         sliders_config = [
             (self.h_min, "Hue Min 1:", 1),
             (self.h_max, "Hue Max 1:", 2),
-            (self.h2_min, "Hue Min 2:", 3),
-            (self.h2_max, "Hue Max 2:", 4),
-            (self.s_min, "Sat Min:", 5),
-            (self.s_max, "Sat Max:", 6),
-            (self.v_min, "Value Min:", 7),
-            (self.v_max, "Value Max:", 8),
+            (self.s_min, "Sat Min:", 3),
+            (self.s_max, "Sat Max:", 4),
+            (self.v_min, "Value Min:", 5),
+            (self.v_max, "Value Max:", 6),
         ]
 
         for var, text, row in sliders_config:
@@ -447,14 +510,19 @@ class GUI:
 
     def transfer_data(self):
         """Transfer GUI settings to controller"""
-        self.controller.h_min = self.h_min.get()
-        self.controller.h_max = self.h_max.get()
-        self.controller.s_min = self.s_min.get()
-        self.controller.s_max = self.s_max.get()
-        self.controller.v_min = self.v_min.get()
-        self.controller.v_max = self.v_max.get()
-        self.controller.h2_min = self.h2_min.get()
-        self.controller.h2_max = self.h2_max.get()
+        primary = self.color_values.get("Color 1", {})
+        secondary = self.color_values.get("Color 2", {})
+
+        self.controller.colors = {
+            "primary": (
+                (primary.get("h_min", 0), primary.get("s_min", 0), primary.get("v_min", 0)),
+                (primary.get("h_max", 255), primary.get("s_max", 255), primary.get("v_max", 255))
+            ),
+            "secondary": (
+                (secondary.get("h_min", 0), secondary.get("s_min", 0), secondary.get("v_min", 0)),
+                (secondary.get("h_max", 255), secondary.get("s_max", 255), secondary.get("v_max", 255))
+            )
+        }
         self.controller.detection_mode = self.detection_var.get()
         self.controller.Kp_x = self.Kp_x.get()
         self.controller.Ki_x = self.Ki_x.get()

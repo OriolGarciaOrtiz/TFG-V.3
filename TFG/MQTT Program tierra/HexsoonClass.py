@@ -29,14 +29,8 @@ class HexsoonController:
         self.panel_width = 320
         self.panel_height = 240
 
-        self.h_min = 0
-        self.h_max = 179
-        self.h2_min = 160
-        self.h2_max = 191
-        self.s_min = 0
-        self.s_max = 255
-        self.v_min = 0
-        self.v_max = 255
+        self.colors: dict | None = None
+        
         self.zoom_factor = 1.5
 
         self.t1 = 166
@@ -185,7 +179,9 @@ class HexsoonController:
         if vehicle is None:
             return
         if self.detection_mode == "Color Contour":
+
             if self.view_mode == "Front View":
+
                 if self.detected_color == "color1":
 
                     step_x = self.for_back / 100.0
@@ -204,6 +200,7 @@ class HexsoonController:
                     send_rc(self.dron, 1500, 1500, 1500,
                             yaw_pwm)  # Ponemos todo a 1500 que es para que se mentanega a la misma altura
                     # Para poner bien las labels:
+
             else:
                 step_x = self.for_back / 100.0
                 step_y = self.left_right / 100.0
@@ -518,14 +515,16 @@ class HexsoonController:
         frame_display = cv2.resize(frame, (self.panel_width, self.panel_height))
         frame_hsv = cv2.cvtColor(frame_display, cv2.COLOR_BGR2HSV)
 
+        c1, c2 = self.colors["primary"], self.colors["secondary"]
+
         # -------- COLOR 1 -------- De momento lo tengo como color verde
-        lower1 = np.array([self.h_min, self.s_min, self.v_min])
-        upper1 = np.array([self.h_max, self.s_max, self.v_max])
+        lower1 = np.array(c1[0])
+        upper1 = np.array(c1[1])
         mask1 = cv2.inRange(frame_hsv, lower1, upper1)
 
         # -------- COLOR 2 -------- De momento lo tengo como color rojo
-        lower2 = np.array([self.h2_min, 137, self.v_min])
-        upper2 = np.array([self.h2_max, self.s_max, self.v_max])
+        lower2 = np.array(c2[0])
+        upper2 = np.array(c2[1])
         mask2 = cv2.inRange(frame_hsv, lower2, upper2)
 
         kernel = np.ones((5, 5), np.uint8)
