@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 from djitellopy import Tello
-import time
+#import time
 ##############################################
 width = 640   # WIDTH OF THE IMAGE
 height = 480  # HEIGHT OF THE IMAGE
@@ -21,46 +21,43 @@ print(me.get_battery())
 me.streamoff()
 me.streamon()
 
+
+
 frameWidth = width
 frameHeight = height
+#cap = cv2.VideoCapture(1)
+#cap.set(3, frameWidth)
+#cap.set(4, frameHeight)
 
 deadZone = 100
 global imgContour
-global object_center
-
-# --- Variables para medir Tu ---
-last_time = time.time()
-last_error_sign = None
-periods = []
+global direction
 def empty(a):
     pass
 
-# TRACKBARS para HSV y Canny
-cv2.namedWindow("HSV")
+cv2.namedWindow("HSV")#Se abre una ventana llamada HSV con los diferentes Trackbars de colores para que los puedas ir modifcando, más adelante en el codigo se usan para definir la máscara HSV del objeto que queremos detectar
 cv2.resizeWindow("HSV", 640, 240)
+#En OpenCV, cuando conviertes una imagen a HSV (cv2.cvtColor(img, cv2.COLOR_BGR2HSV)), cada pixel ya no se representa en RGB (rojo, verde, azul) sino con 3 componentes:
+#1.HUE(tono,matiz) sería el color en sí, esto va de 0 a 179 el amarillo está entre 20-40 que sería lo que pondríamos de mínimos y de maximo
 cv2.createTrackbar("HUE Min", "HSV", 60, 179, empty)
 cv2.createTrackbar("HUE Max", "HSV", 82, 179, empty)
+#2.SAT: es la saturación,intensidad del color , un 0 sería un color muy gris y un 255 un color muy puro, con esto filtramos colores de saturación baja
 cv2.createTrackbar("SAT Min", "HSV", 100, 255, empty)
 cv2.createTrackbar("SAT Max", "HSV", 255, 255, empty)
+#3.VALUE: esto sería básciamente el brillo, intentamos quitar zonas sin luz, se tiene que ver bien el objeto
 cv2.createTrackbar("VALUE Min", "HSV", 50, 255, empty)
 cv2.createTrackbar("VALUE Max", "HSV", 255, 255, empty)
-
+#"Threshold1" y "Threshold2" → son los valores inferior y superior que se usan en el filtro Canny para detectar bordes. Con los sliders puedes ajustar qué tan sensibles son a los cambios de intensidad.
+#"Area" → establece el área mínima del contorno que quieres considerar. Si un objeto detectado tiene un área menor que ese valor, se descarta (para evitar ruido).
 cv2.namedWindow("Parameters")
 cv2.resizeWindow("Parameters", 640, 240)
 cv2.createTrackbar("Threshold1", "Parameters", 166, 255, empty)
 cv2.createTrackbar("Threshold2", "Parameters", 171, 255, empty)
 cv2.createTrackbar("Area", "Parameters", 1750, 30000, empty)
 
-
-
-#Guardan memoria del error previo e integran errores acumulados.
-prev_error_x = 0
-prev_error_y = 0
-integral_x = 0
-integral_y = 0
-
-
-
+#Stack images oma una colección de imágenes (puede ser una fila de imágenes o una matriz 2×N / M×N) y devuelve una única imagen con todas ellas apiladas (horizontalmente por fila y luego verticalmente entre filas).
+#Además ajusta automáticamente el tamaño de las imágenes (aplica scale o las redimensiona para que todas tengan la misma forma), y convierte imágenes en gris a BGR para evitar errores al apilarlas con imágenes color.
+#Se usa para mostrar varias etapas del procesamiento (por ejemplo: imagen original, máscara, Canny, contornos) en una sola ventana de debugging.
 def stackImages(scale, imgArray):
     #Scale=factor de escala, si tenemos un imagen de 240x320 y scale=0.9 pues reduce la imagen a 216x288
     rows = len(imgArray)
@@ -105,47 +102,124 @@ def stackImages(scale, imgArray):
 
     return ver
 
-# Detecta contornos y devuelve el centroide del objeto
+#getContours(img, imgContour) es la función que toma la imagen binaria (normalmente el resultado de Canny + dilate o una máscara) y:
+#busca todos los contornos (cv2.findContours),
+#filtra por área mínima (evita ruido),
+#calcula propiedades del contorno (perímetro, aproximación poligonal, bounding box, centro),
+#dibuja información en imgContour (contorno, rectángulo, textos, línea hacia el centro),
+#decide en qué “zona” de la pantalla está el objeto (izquierda/derecha/arriba/abajo) comparando el centro del objeto con el centro del frame ± deadZone, y pinta un aviso visual (“GO LEFT”, etc.).
+#Esa decisión visual es la que debería asignar una variable de control (dir) para después traducirla a velocidades del dron.
 def getContours(img, imgContour):
-    global object_center
-    object_center = None
+    global direction
+    direction = 5  # Centro por defecto
     contours, hierarchy = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
     for cnt in contours:
         area = cv2.contourArea(cnt)
         areaMin = cv2.getTrackbarPos("Area", "Parameters")
-        if area > areaMin:
-            x, y, w, h = cv2.boundingRect(cnt)
+        if area > areaMin:  # Solo procesar contornos grandes
+            cv2.drawContours(imgContour, cnt, -1, (255, 0, 255), 7)
+            peri = cv2.arcLength(cnt, True)
+            approx = cv2.approxPolyDP(cnt, 0.02 * peri, True)
+            #print(len(approx))  # Número de vértices
+            x, y, w, h = cv2.boundingRect(approx)
+
+            # Dibujar rectángulo verde y textos de depuración
+            cv2.rectangle(imgContour, (x, y), (x + w, y + h), (0, 255, 0), 5)
+            cv2.putText(imgContour, "Points: " + str(len(approx)),
+                        (x + w + 20, y + 20), cv2.FONT_HERSHEY_COMPLEX,
+                        0.7, (0, 255, 0), 2)
+            cv2.putText(imgContour, "Area: " + str(int(area)),
+                        (x + w + 20, y + 45), cv2.FONT_HERSHEY_COMPLEX,
+                        0.7, (0, 255, 0), 2)
+            cv2.putText(imgContour, str(int(x)) + " " + str(int(y)),
+                        (x - 20, y - 45), cv2.FONT_HERSHEY_COMPLEX,
+                        0.7, (0, 255, 0), 2)
+
+            # Centro del objeto
             cx = int(x + w / 2)
             cy = int(y + h / 2)
-            object_center = (cx, cy) #En vez de calcular un direction, devolvemos el centro del objeto detectado.
-            # Dibuja el rectángulo y centro
-            cv2.rectangle(imgContour, (x, y), (x + w, y + h), (0, 255, 0), 5)
-            cv2.circle(imgContour, (cx, cy), 5, (0, 0, 255), cv2.FILLED)
             cv2.line(imgContour, (int(frameWidth / 2), int(frameHeight / 2)), (cx, cy), (0, 0, 255), 3)
-            break  # Usamos solo el contorno más grande
 
+            # Determinar zona 9 cuadrantes y dibujar visual
+            if cx < int(frameWidth / 2) - deadZone:  # Izquierda
+                if cy < int(frameHeight / 2) - deadZone:  # Arriba-Izquierda
+                    direction = 1
+                    cv2.putText(imgContour, "GO UP-LEFT", (20, 50), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255), 3)
+                    cv2.rectangle(imgContour, (0, 0), (int(frameWidth / 2) - deadZone, int(frameHeight / 2) - deadZone),
+                                  (0, 0, 255), cv2.FILLED)
+                elif cy > int(frameHeight / 2) + deadZone:  # Abajo-Izquierda
+                    direction = 7
+                    cv2.putText(imgContour, "GO DOWN-LEFT", (20, 50), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255), 3)
+                    cv2.rectangle(imgContour, (0, int(frameHeight / 2) + deadZone),
+                                  (int(frameWidth / 2) - deadZone, frameHeight), (0, 0, 255), cv2.FILLED)
+                else:  # Centro-Izquierda
+                    direction = 4
+                    cv2.putText(imgContour, "GO LEFT", (20, 50), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255), 3)
+                    cv2.rectangle(imgContour, (0, int(frameHeight / 2) - deadZone),
+                                  (int(frameWidth / 2) - deadZone, int(frameHeight / 2) + deadZone), (0, 0, 255),
+                                  cv2.FILLED)
+
+            elif cx > int(frameWidth / 2) + deadZone:  # Derecha
+                if cy < int(frameHeight / 2) - deadZone:  # Arriba-Derecha
+                    direction = 3
+                    cv2.putText(imgContour, "GO UP-RIGHT", (20, 50), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255), 3)
+                    cv2.rectangle(imgContour, (int(frameWidth / 2) + deadZone, 0),
+                                  (frameWidth, int(frameHeight / 2) - deadZone), (0, 0, 255), cv2.FILLED)
+                elif cy > int(frameHeight / 2) + deadZone:  # Abajo-Derecha
+                    direction = 9
+                    cv2.putText(imgContour, "GO DOWN-RIGHT", (20, 50), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255), 3)
+                    cv2.rectangle(imgContour, (int(frameWidth / 2) + deadZone, int(frameHeight / 2) + deadZone),
+                                  (frameWidth, frameHeight), (0, 0, 255), cv2.FILLED)
+                else:  # Centro-Derecha
+                    direction = 6
+                    cv2.putText(imgContour, "GO RIGHT", (20, 50), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255), 3)
+                    cv2.rectangle(imgContour, (int(frameWidth / 2) + deadZone, int(frameHeight / 2) - deadZone),
+                                  (frameWidth, int(frameHeight / 2) + deadZone), (0, 0, 255), cv2.FILLED)
+
+            else:  # Centro X
+                if cy < int(frameHeight / 2) - deadZone:  # Arriba
+                    direction = 2
+                    cv2.putText(imgContour, "GO UP", (20, 50), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255), 3)
+                    cv2.rectangle(imgContour, (int(frameWidth / 2) - deadZone, 0),
+                                  (int(frameWidth / 2) + deadZone, int(frameHeight / 2) - deadZone), (0, 0, 255),
+                                  cv2.FILLED)
+                elif cy > int(frameHeight / 2) + deadZone:  # Abajo
+                    direction = 8
+                    cv2.putText(imgContour, "GO DOWN", (20, 50), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255), 3)
+                    cv2.rectangle(imgContour, (int(frameWidth / 2) - deadZone, int(frameHeight / 2) + deadZone),
+                                  (int(frameWidth / 2) + deadZone, frameHeight), (0, 0, 255), cv2.FILLED)
+                else:  # Centro
+                    direction = 5
+                    cv2.putText(imgContour, "CENTER", (20, 50), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 255, 0), 3)
+
+
+#La función display(img) sirve para dibujar en la pantalla una “guía visual” que divide la imagen en zonas de control,
+# de manera que sepas si el objeto está dentro o fuera de la zona central (dead zone).
+def display(img):
+    #Lineas verticales
+    cv2.line(img, (int(frameWidth/2) - deadZone, 0),
+                  (int(frameWidth/2) - deadZone, frameHeight), (255, 255, 0), 3)
+    cv2.line(img, (int(frameWidth/2) + deadZone, 0),
+                  (int(frameWidth/2) + deadZone, frameHeight), (255, 255, 0), 3)
+    #Cirulo rojo en el centro del frame
+    cv2.circle(img, (int(frameWidth/2), int(frameHeight/2)), 5, (0, 0, 255), 5)
+    #Lineas horizontales (verticales+horizontales conseguimos el tablero de cuadrados)
+    cv2.line(img, (0, int(frameHeight/2) - deadZone),
+                  (frameWidth, int(frameHeight/2) - deadZone), (255, 255, 0), 3)
+    cv2.line(img, (0, int(frameHeight/2) + deadZone),
+                  (frameWidth, int(frameHeight/2) + deadZone), (255, 255, 0), 3)
 
 
 simulation = True  # Cambiar a False para vuelo real
 startCounter = 1  # Cambiar a 0 para que haga el takeoff
-last_time = None
 while True:
-
-
+    direction = 5
     frame_read = me.get_frame_read()
     myFrame = frame_read.frame
     img = cv2.resize(myFrame, (width, height))
     imgContour = img.copy()
     imgHsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-
-    # --- Medimos frecuencia de muestreo ---
-    now = time.time()
-    if last_time is not None:  # Evita la primera iteración
-        dt = now - last_time
-        if dt > 0:
-            print(f"dt = {dt:.4f} s, frecuencia ≈ {1 / dt:.2f} Hz")
-    last_time = now
 
     # --- máscara y procesado ---
     h_min = cv2.getTrackbarPos("HUE Min", "HSV")
@@ -159,7 +233,7 @@ while True:
     upper = np.array([h_max, s_max, v_max])
     mask = cv2.inRange(imgHsv, lower, upper)
     result = cv2.bitwise_and(img, img, mask=mask)
-    mask_bgr = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+    mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
 
     imgBlur = cv2.GaussianBlur(result, (7, 7), 1)
     imgGray = cv2.cvtColor(imgBlur, cv2.COLOR_BGR2GRAY)
@@ -170,108 +244,87 @@ while True:
     kernel = np.ones((5, 5))
     imgDil = cv2.dilate(imgCanny, kernel, iterations=1)
 
-    # --- detección de contorno principal ---
-    object_center = None
-    contours, _ = cv2.findContours(imgDil, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    if contours:
-        c = max(contours, key=cv2.contourArea)  # contorno más grande
-        x, y, w, h = cv2.boundingRect(c)
-        cv2.rectangle(imgContour, (x, y), (x + w, y + h), (0, 255, 0), 2)
-        object_center = (x + w // 2, y + h // 2)
-        cv2.circle(imgContour, object_center, 5, (0, 0, 255), cv2.FILLED)
+    getContours(imgDil, imgContour)
+    display(imgContour)
 
-
-    # --- control con PID ---
-    speed_yaw, speed_ud = 0, 0
-    if object_center is not None:
-        cx, cy = object_center
-
-        cv2.line(imgContour, (int(frameWidth / 2), int(frameHeight / 2)), (cx, cy), (0, 0, 255), 3)
-        #error_x = (frameWidth / 2) - cx
-        error_x = cx - (frameWidth / 2)
-        error_y = (frameHeight / 2) - cy
-
-        #Kp = 0.7  # Ganancia proporcional #Kp: cuánto corrige según el error actual.
-        #Ki = 0.0005  # Ganancia integral #Ki: cuánto acumula errores pasados.
-        #Kd = 0.2  # Ganancia derivativa #Kd: cuánto anticipa el cambio (suaviza).
-        #Ziegler Nichols Metodo con Tu=0.75 y kp=0.7
-        Kp = 0.42
-        Ki = 0.0005
-        Kd = 0.2
-
-        # Variables estáticas
-        integral_x += error_x
-        derivative_x = error_x - prev_error_x
-
-        integral_y += error_y
-        derivative_y = error_y - prev_error_y
-
-        # --- elegir modo ---
-        valor = 6  # 1=P, 2=I, 3=D, otro=PID completo
-
-        if valor == 0:  # Modo Ziegler–Nichols (solo Kp bajo, medir Tu)
-            speed_yaw = int(Kp * error_x)
-            speed_ud = 0  # no tocamos altura
-
-            # Medir periodo Tu
-            current_time = time.time()
-            error_sign = np.sign(error_x)
-
-            if last_error_sign is not None and error_sign != last_error_sign and error_sign != 0:
-                Tu = current_time - last_time
-                periods.append(Tu)
-                print(f"Oscilación detectada, periodo = {Tu:.2f} s")
-                last_time = current_time
-
-            last_error_sign = error_sign
-        elif valor == 1:   # P
-            speed_yaw = int(Kp * error_x)
-            speed_ud  = int(Kp * error_y)
-        elif valor == 2: # I
-            speed_yaw = int(Ki * integral_x)
-            speed_ud = int(Ki * integral_y)
-        elif valor == 3: # D
-            speed_yaw = int(Kd * derivative_x)
-            speed_ud = int(Kd * derivative_y)
-        elif valor == 4: #PI
-            speed_yaw = int(Kp * error_x + Ki * integral_x)
-            speed_ud = int(Kp * error_y + Ki * integral_y)
-        elif valor == 5: #PD
-            speed_yaw = int(Kp * error_x + Kd * derivative_x)
-            speed_ud = int(Kp * error_y + Kd * derivative_y)
-        else:            # PID completo
-            speed_yaw = int(Kp * error_x + Ki * integral_x + Kd * derivative_x)
-            speed_ud = int(Kp * error_y + Ki * integral_y + Kd * derivative_y)
-
-        # Actualizamos errores previos
-        prev_error_x = error_x
-        prev_error_y = error_y
-
-    # --- mandar al dron (simulación o real) ---
-    me.left_right_velocity = 0
-    me.for_back_velocity = 0
-    #speed_yaw = int(np.clip(speed_yaw, -60, 60))
-    #speed_ud = int(np.clip(speed_ud, -60, 60))
-    me.up_down_velocity = speed_ud
-    me.yaw_velocity = speed_yaw
     # --- despegue ---
     if not simulation and startCounter == 0:
         me.takeoff()
         me.send_rc_control(0, 0, 0, 0)
         startCounter = 1
 
+    # --- asignar velocidades ---
+    speed_lr = 0
+    speed_fb = 0
+    speed_ud = 0
+    speed_yaw = 0
+    velocity = 60
+
+    if direction == 1:
+        speed_lr = 0
+        speed_fb = 0
+        speed_yaw = -velocity
+        speed_ud = velocity
+    elif direction == 2:
+        speed_lr = 0
+        speed_fb = 0
+        speed_yaw = 0
+        speed_ud = velocity
+    elif direction == 3:
+        speed_lr = 0
+        speed_fb = 0
+        speed_yaw = velocity
+        speed_ud = velocity
+    elif direction == 4:
+        speed_lr = 0
+        speed_fb = 0
+        speed_ud = 0
+        speed_yaw = -velocity
+    elif direction == 5:
+        speed_lr = 0
+        speed_fb = 0
+        speed_ud = 0
+        speed_yaw = 0
+    elif direction == 6:
+        speed_lr = 0
+        speed_fb = 0
+        speed_ud = 0
+        speed_yaw = velocity
+    elif direction == 7:
+        speed_lr = 0
+        speed_fb = 0
+        speed_yaw = -velocity
+        speed_ud = -velocity
+    elif direction == 8:
+        speed_lr = 0
+        speed_fb = 0
+        speed_yaw = 0
+        speed_ud = -velocity
+    elif direction == 9:
+        speed_lr = 0
+        speed_fb = 0
+        speed_yaw = velocity
+        speed_ud = -velocity
+
+    me.left_right_velocity = speed_lr
+    me.for_back_velocity = speed_fb
+    me.up_down_velocity = speed_ud
+    me.yaw_velocity = speed_yaw
+
+    # --- enviar comandos solo en vuelo real --- #No obstante esto no es un PID, la velocidad es constante.
+    # Con un PID, la velocidad ya no es fija, sino proporcional a cuánto se ha desviado el objeto de donde debería estar. Eso da un movimiento mucho más suave y ajustado.
+
     if not simulation:
         me.send_rc_control(me.left_right_velocity,
                            me.for_back_velocity,
                            me.up_down_velocity,
                            me.yaw_velocity)
+        print("Dirección:", direction)
     else:
-        print(f"Simulación → yaw: {speed_yaw}, up/down: {speed_ud}")
+        print("Dirección:", direction)
 
-    # --- mostrar todas las imágenes en una sola ventana ---
-    stack = stackImages(0.9, ([img, result, mask_bgr],
-                              [imgDil, imgContour, img]))
-    cv2.imshow('Seguimiento con PID', stack)
+    stack = stackImages(0.7, ([img, result], [imgDil, imgContour]))
+    cv2.imshow('Horizontal Stacking', stack)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         if not simulation:

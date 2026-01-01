@@ -8,5 +8,7 @@ eventlet
 ultralytics
 pygetwindow
 pymavlink
-pywin32
 mss
+paho-mqtt
+aiortc
+websockets

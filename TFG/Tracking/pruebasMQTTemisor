@@ -1,0 +1,56 @@
+import paho.mqtt.client as mqtt
+import time
+import json
+
+BROKER = "broker.hivemq.com"
+PORT = 1883
+TOPIC_PUB = "test/chat/pub"  # Publica aquí
+TOPIC_SUB = "test/chat/sub"  # Recibe respuestas aquí
+
+def transfer_data(data: dict) -> str:
+    return json.dumps(data)
+
+
+def prepare_data(data: dict) -> dict:
+
+    previous_data: dict = data
+    data: dict = previous_data
+    
+    return data
+
+# --- Callback para mensajes recibidos ---
+def on_message(client, userdata, msg):
+    print(f"📥 Respuesta del suscriptor: {msg.payload.decode()}")
+
+client = mqtt.Client()
+client.on_message = on_message
+
+# --- Conectar y suscribirse al canal de respuesta ---
+client.connect(BROKER, PORT, 60)
+client.subscribe(TOPIC_SUB)
+
+client.loop_start()
+
+print("✅ Publicador conectado. Enviando mensajes...")
+Kp, Ki, Kd = 1, 0.0001, 3
+opt_tipo = 'Color Detection'
+
+data: dict = {"Kp" : Kp, "Ki" : Ki, "Kd" : Kd, "opt_tipo" : opt_tipo}
+
+while True:
+
+    data: dict = {"Kp" : Kp, "Ki" : Ki, "Kd" : Kd, "opt_tipo" : opt_tipo}
+
+    data = prepare_data(data)
+
+    message = transfer_data(data)
+
+    #message = f"Hola #{count} desde el publicador"
+    client.publish(TOPIC_PUB, message)
+    print(f"📤 Mensaje enviado: {message}")
+    time.sleep(3)
+
+    Kp = Kp + 0.1
+    Ki = Ki + 0.001
+    Kd = Kd + 0.1
+    

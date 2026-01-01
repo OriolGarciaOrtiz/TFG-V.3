@@ -3,7 +3,8 @@ from SimpleTelloGUI import *
 from HexsoonGUI import GUI as HexsoonGUI
 import tkinter as tk
 from tkinter import Label, Button, Frame, messagebox
-print("gay")
+import socket
+
 
 class DroneLauncher:
     def __init__(self, root):
