@@ -7,8 +7,6 @@ from tkinter import Label
 from PIL import Image, ImageTk
 import threading
 import queue
-import paho.mqtt.client as mqtt
-import json
 import time
 from colorama import init, Fore
 

@@ -6,7 +6,7 @@ from PIL import Image, ImageTk
 
 
 class SimpleTelloGUI:
-    def __init__(self, root):
+    def __init__(self, root: tk.Tk):
         self.root = root
         root.attributes('-fullscreen', True)
         root.bind("<Escape>", lambda e: root.attributes('-fullscreen', False))
@@ -171,13 +171,13 @@ class SimpleTelloGUI:
                 speed_x = int(Kpx * error_x + Kix * self.controller.integral_x + Kdx * derivative_x)
                 speed_y = int(Kpy * error_y + Kiy * self.controller.integral_y + Kdy * derivative_y)
 
-                self.controller.me.left_right_velocity = int(np.clip(speed_x, -self.max_velocity, self.max_velocity))
-                self.controller.me.up_down_velocity = int(np.clip(speed_y, -self.max_velocity, self.max_velocity))
+                self.controller.left_right_velocity = int(np.clip(speed_x, -self.max_velocity, self.max_velocity))
+                self.controller.up_down_velocity = int(np.clip(speed_y, -self.max_velocity, self.max_velocity))
 
-                self.controller.me.send_rc_control(self.controller.me.left_right_velocity,
-                                                   self.controller.me.for_back_velocity,
-                                                   self.controller.me.up_down_velocity,
-                                                   self.controller.me.yaw_velocity)
+                self.controller.me.send_rc_control(self.controller.left_right_velocity,
+                                                   self.controller.for_back_velocity,
+                                                   self.controller.up_down_velocity,
+                                                   self.controller.yaw_velocity)
 
                 self.controller.prev_error_x, self.controller.prev_error_y = error_x, error_y
 
@@ -189,12 +189,3 @@ class SimpleTelloGUI:
             self.video_label.configure(image=imgtk)
 
         self.root.after(30, self.update_frame)
-
-
-'''
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = SimpleTelloGUI(root)
-    app.update_frame()
-    root.mainloop()
-'''
