@@ -2,6 +2,7 @@ from ultralytics import YOLO
 from djitellopy import Tello
 import os
 import threading
+from tkinter import filedialog
 
 
 class DroneController:
@@ -14,6 +15,8 @@ class DroneController:
         self.integral_y = 0
         self.integral_z = 0
 
+        self.model: YOLO | None = None
+
         self.IMG_SAVE_PATH = r"taller-dron-Tello\Lib\Img_Calibracion"
         self.PARAM_SAVE_PATH = r"taller-dron-Tello\Lib\Parameters"
         os.makedirs(self.IMG_SAVE_PATH, exist_ok=True)
@@ -25,28 +28,6 @@ class DroneController:
         self.up_down_velocity = 0
         self.yaw_velocity = 0
         self.speed = 0
-
-        try:
-            self.model = YOLO(r"Yolo Models\best_RC_Final.pt")
-            print("YOLO model loaded successfully.")
-        except Exception as e:
-            print("Could not load YOLO model:", e)
-            self.model = None
-
-        try:
-            self.model_exterior = YOLO(r"Yolo Models\RC_exterior.pt")
-            print("YOLO exterior model loaded successfully.")
-        except Exception as e:
-            print("Could not load YOLO exterior model:", e)
-            self.model_exterior = None
-
-
-        try:
-            self.model2 = YOLO(r"Yolo Models\red_Prueba.pt")
-            print("YOLO Game Mode model loaded successfully.")
-        except Exception as e:
-            print("Could not load Game Mode model:", e)
-            self.model2 = None
 
     def safe_takeoff(self):
         if self.is_connected:
@@ -62,6 +43,35 @@ class DroneController:
 
     def go_up(self, distance=70):
         if self.is_connected:
-            threading.Thread(target=lambda: self.me.move_up(distance)).start()
+            self.me.move_up(distance)
         else:
             print("[DroneController] Drone not connected. Cannot go up.")
+
+    def load_model(self):
+
+        archivo = filedialog.askopenfilename(
+            title="Seleccionar archivo",
+            initialdir="Yolo Models"
+        )
+
+        try: 
+
+            self.model = YOLO(archivo)
+            print("YOLO model correctly loaded")
+
+        except:
+
+            print("Error loading YOLO model")
+
+
+    def drone_connection(self):
+        try:
+            self.me.connect()
+            self.is_connected = True
+            self.me.streamoff()
+            self.me.streamon()
+            print(f"Connected! Battery: {self.me.get_battery()}%")
+
+        except Exception as e:
+            self.is_connected = False
+            print("Connection failed:", e)
