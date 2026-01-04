@@ -3,7 +3,7 @@ import ctypes
 import cv2
 import numpy as np
 import tkinter as tk
-from tkinter import Label
+from tkinter import Label, messagebox
 from PIL import Image, ImageTk
 import threading
 import queue
@@ -33,6 +33,8 @@ class GUI:
 
         # Thread control
         self.running = True
+
+        self.presets, self.color_menu = self.load_colors("colors.txt")
 
         self.setup_gui()
 
@@ -93,10 +95,30 @@ class GUI:
 
         self.battery_label = Label(self.root, text="Battery: -", font=("Arial", 14))
         self.battery_label.grid(row=0, column=2, padx=10, pady=10)
+
+    def load_colors(self, path: str):
+        presets = {}
+        names = []
+
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+
+                name = line.split("'", 2)[1]
+                values = tuple(map(int, line.split("'", 2)[2].split()))
+
+                presets[name] = values
+                names.append(name)
+
+        return presets, names
+
+
     
     def apply_color_preset(self, *args):
         preset = self.color_opt.get()
-        presets = {
+        self.presets = {
             "Green":  (35, 85, 55, 255, 100, 255),
             "Pink":   (140, 170, 20, 255, 100, 255),
             "Blue":   (85, 135, 100, 255, 100, 255),
@@ -104,7 +126,7 @@ class GUI:
             "Yellow": (0, 30, 0, 255, 23, 255),
             "Clouded Yellow": (0, 49, 0, 255, 23, 255)
         }
-        values = presets.get(preset)
+        values = self.presets.get(preset)
         if not values:
             return
 
@@ -146,18 +168,111 @@ class GUI:
         # Restore preset dropdown
         self.color_opt.set(values.get("preset", "Green"))
 
-        self.updating_sliders = False  # Re-enable slider callback
+        self.updating_sliders = False
+
+    def create_color(self):
+        window = tk.Toplevel(self.root)
+        window.title("Create Color")
+        window.resizable(False, False)
+
+        # -------------------------
+        # Color name
+        # -------------------------
+        tk.Label(window, text="Color name:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+        name_entry = tk.Entry(window, width=22)
+        name_entry.grid(row=0, column=1, padx=10, pady=5)
+
+        # -------------------------
+        # HSV variables
+        # -------------------------
+        h_min = tk.IntVar(value=0)
+        h_max = tk.IntVar(value=255)
+        s_min = tk.IntVar(value=0)
+        s_max = tk.IntVar(value=255)
+        v_min = tk.IntVar(value=0)
+        v_max = tk.IntVar(value=255)
+
+        sliders = [
+            (h_min, "Hue Min:", 0, 179),
+            (h_max, "Hue Max:", 0, 179),
+            (s_min, "Sat Min:", 0, 255),
+            (s_max, "Sat Max:", 0, 255),
+            (v_min, "Value Min:", 0, 255),
+            (v_max, "Value Max:", 0, 255),
+        ]
+
+        for i, (var, text, frm, to) in enumerate(sliders, start=1):
+            tk.Label(window, text=text).grid(row=i, column=0, padx=10, pady=4, sticky="w")
+            tk.Scale(
+                window,
+                from_=frm,
+                to=to,
+                orient="horizontal",
+                variable=var,
+                length=220
+            ).grid(row=i, column=1, padx=10)
+
+        # -------------------------
+        # Create + save
+        # -------------------------
+        def create():
+            name = name_entry.get().strip()
+            if not name:
+                messagebox.showwarning("Missing name", "Please enter a color name.")
+                return
+
+            if name in self.presets:
+                messagebox.showwarning("Duplicate", "Color already exists.")
+                return
+
+            values = (
+                h_min.get(), h_max.get(),
+                s_min.get(), s_max.get(),
+                v_min.get(), v_max.get(),
+            )
+
+            # Append to file
+            with open("colors.txt", "a", encoding="utf-8") as f:
+                f.write(f"\n'{name}' " + " ".join(map(str, values)))
+
+            self.presets, self.color_menu = self.load_colors("colors.txt")
+
+            self.root.after(0, self.refresh_color_menu)
+
+            window.destroy()
+
+        tk.Button(window, text="Create", command=create).grid(
+            row=len(sliders) + 1,
+            column=0,
+            columnspan=2,
+            pady=12
+        )
+
+    def refresh_color_menu(self):
+        menu = self.color_menu_widget["menu"]
+        menu.delete(0, "end")
+
+        for color in self.color_menu:
+            menu.add_command(
+                label=color,
+                command=lambda value=color: self.color_opt.set(value)
+            )
+
+
 
     def create_control_buttons(self):
         self.color_opt = tk.StringVar(value="Green")
-        color_menu = tk.OptionMenu(self.root, self.color_opt,
-                                            "Green", "Pink", "Blue", "Oranje", "Yellow", "Clouded Yellow")
-        color_menu.grid(row=7, column=1, padx=10, pady=10)
+        self.color_menu_widget = tk.OptionMenu(self.root, self.color_opt, *self.color_menu)
+        self.color_menu_widget.grid(row=7, column=1, padx=10, pady=10)
 
         self.color_sel = tk.StringVar(value="Color 1")
         color_selection = tk.OptionMenu(self.root, self.color_sel,
                                             "Color 1", "Color 2")
         color_selection.grid(row=7, column=0, padx=10, pady=10)
+
+        self.create_color_button = tk.Button(self.root, text="Create Color",
+                                         command=lambda: self.run_in_thread(self.create_color))
+        self.create_color_button.grid(column=0, row=8, padx=10, pady=10)
 
         self.color_opt.trace_add("write", self.apply_color_preset)
         self.color_sel.trace_add("write", self.switch_color)
@@ -272,8 +387,8 @@ class GUI:
         self.v_min, self.v_max = tk.IntVar(value=100), tk.IntVar(value=255)
 
         sliders_config = [
-            (self.h_min, "Hue Min 1:"),
-            (self.h_max, "Hue Max 1:"),
+            (self.h_min, "Hue Min:"),
+            (self.h_max, "Hue Max:"),
             (self.s_min, "Sat Min:"),
             (self.s_max, "Sat Max:"),
             (self.v_min, "Value Min:"),
