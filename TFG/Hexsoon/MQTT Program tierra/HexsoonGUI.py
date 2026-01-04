@@ -101,7 +101,8 @@ class GUI:
             "Pink":   (140, 170, 20, 255, 100, 255),
             "Blue":   (85, 135, 100, 255, 100, 255),
             "Oranje": (0, 30, 160, 255, 100, 255),         # 0, 10, 90, 255, 100, 255
-            "Yellow": (0, 49, 0, 255, 23, 255),
+            "Yellow": (0, 30, 0, 255, 23, 255),
+            "Clouded Yellow": (0, 49, 0, 255, 23, 255)
         }
         values = presets.get(preset)
         if not values:
@@ -150,7 +151,7 @@ class GUI:
     def create_control_buttons(self):
         self.color_opt = tk.StringVar(value="Green")
         color_menu = tk.OptionMenu(self.root, self.color_opt,
-                                            "Green", "Pink", "Blue", "Oranje", "Yellow")
+                                            "Green", "Pink", "Blue", "Oranje", "Yellow", "Clouded Yellow")
         color_menu.grid(row=7, column=1, padx=10, pady=10)
 
         self.color_sel = tk.StringVar(value="Color 1")

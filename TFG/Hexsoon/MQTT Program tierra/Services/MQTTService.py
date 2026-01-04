@@ -46,6 +46,7 @@ class MQTT:
     def prepare_all_data(self) -> str:
         """Prepare COMPLETE data package with ALL parameters"""
         msg_dict = {
+
             # HSV values
             'h_min': self.target_gui.h_min.get(),
             'h_max': self.target_gui.h_max.get(),
@@ -72,9 +73,9 @@ class MQTT:
             # Other settings
             'max_velocity': self.target_gui.max_velocity.get(),
 
-            # Click states from CONTROLLER (not pending_clicks)
+            # Click states 
             'connect_click': self.target_gui.controller.click_connect,
-            'disconnect_click': self.target_gui.controller.click_disconnect,
+            'disconnect_click': self.target_gui.controller.click_disconnect
         }
 
         return json.dumps(msg_dict)
