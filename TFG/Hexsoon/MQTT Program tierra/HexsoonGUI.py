@@ -77,7 +77,6 @@ class GUI:
             except Exception as e:
                 print(Fore.RED + f"Error: {str(e)}")
 
-        # Start the thread
         thread = threading.Thread(target=task, daemon=True)
         thread.start()
         return thread
@@ -87,7 +86,6 @@ class GUI:
         self.connected_label = Label(self.root, text="Not Connected", font=("Arial", 14))
         self.connected_label.grid(row=0, column=0, padx=10, pady=10)
 
-        # Use original command that sets controller.click_connect
         self.connect_button = tk.Button(self.root, text="Connect",
                                         command=lambda: self.run_in_thread(self.controller.connect_drone))
         self.connect_button.grid(row=0, column=1, padx=10, pady=10)
@@ -145,10 +143,9 @@ class GUI:
     def switch_color(self, *_):
         selected = self.color_sel.get()
         values = self.color_values.get(selected)
+        
         if not values:
             return
-
-        self.updating_sliders = True  # Block slider callback
 
         # Restore last slider values for this color
         self.h_min.set(values["h_min"])
@@ -160,8 +157,6 @@ class GUI:
 
         # Restore preset dropdown
         self.color_opt.set(values.get("preset", "Green"))
-
-        self.updating_sliders = False
 
 
     def create_color(self):
@@ -294,7 +289,7 @@ class GUI:
         
         self.load_model_button = tk.Button(self.root, text="Load Yolo model", 
                                         command=lambda: self.run_in_thread(self.controller.load_model))
-        self.load_model_button.grid(column=8, row=1, padx=10, pady=10)
+        self.load_model_button.grid(column=1, row=8, padx=10, pady=10)
 
 
     def create_mode_selectors(self):
@@ -429,14 +424,24 @@ class GUI:
 
 
     def create_velocity_display(self):
-        self.lr_label = Label(self.root, text="Left-Right Velocity = 0", font=("Arial", 14))
-        self.lr_label.grid(column=3, row=3)
-        self.fb_label = Label(self.root, text="For-Back Velocity = 0", font=("Arial", 14))
-        self.fb_label.grid(column=3, row=4)
-        self.ud_label = Label(self.root, text="Up-Down Velocity = 0", font=("Arial", 14))
-        self.ud_label.grid(column=3, row=5)
-        self.yaw_label = Label(self.root, text="Yaw Velocity = 0", font=("Arial", 14))
-        self.yaw_label.grid(column=3, row=6)
+        label_width = 28
+        
+        self.lr_label = Label(self.root, text="Left-Right Velocity = 0.00", 
+                            font=("Arial", 14), width=label_width, anchor="w")
+        self.lr_label.grid(column=3, row=3, sticky="w")
+        
+        self.fb_label = Label(self.root, text="For-Back Velocity = 0.00", 
+                            font=("Arial", 14), width=label_width, anchor="w")
+        self.fb_label.grid(column=3, row=4, sticky="w")
+        
+        self.ud_label = Label(self.root, text="Up-Down Velocity = 0.00", 
+                            font=("Arial", 14), width=label_width, anchor="w")
+        self.ud_label.grid(column=3, row=5, sticky="w")
+        
+        self.yaw_label = Label(self.root, text="Yaw Velocity = 0.00", 
+                            font=("Arial", 14), width=label_width, anchor="w")
+        self.yaw_label.grid(column=3, row=6, sticky="w")
+
 
 
     def create_video_panels(self):

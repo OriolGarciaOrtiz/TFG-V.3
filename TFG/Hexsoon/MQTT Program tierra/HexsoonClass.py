@@ -48,11 +48,11 @@ class HexsoonController:
         self.Ki_y = 0
         self.Kd_y = 0
 
-        self.PID_mode = "PID"  # or "P", "I", "D", etc.
+        self.PID_mode = "PID"
 
         self.max_velocity = 50
 
-        self.view_mode = "Front View"  # or "Down View" etc.
+        self.view_mode = "Front View"
 
         self.take_off_alt = 2
 
@@ -86,7 +86,7 @@ class HexsoonController:
             self.data = yaml.safe_load(f)
 
         self.yolo_queue = queue.Queue(maxsize=1)
-        self.yolo_result = (None, [])  # (object_center, boxes_info)
+        self.yolo_result = (None, [])
         self.yolo_lock = threading.Lock()
         self.yolo_running = True
 

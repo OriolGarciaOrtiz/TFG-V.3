@@ -12,7 +12,6 @@ def main():
 
         root = tk.Tk()
 
-        # Crear ventana secundaria
         root.title("Hexagon Drone")
         root.state('zoomed')
 
@@ -30,7 +29,6 @@ def main():
         
         hexsoon_gui.update_frame()
 
-        # Función de cierre
         def on_closing():
             receiver.running = False
             mission_planner.running = False
