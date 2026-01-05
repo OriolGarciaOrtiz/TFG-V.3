@@ -4,6 +4,7 @@ import threading
 from Services.WebRTCService import DroneVideoReceiver
 from Services.MissionPlannerService import MissionPlanner
 from Services.MQTTService import MQTT
+from Services.VideoService import ServiceVideo
 
 
 def main():
@@ -17,13 +18,15 @@ def main():
 
         hexsoon_gui = HexsoonGUI(root)
 
-        receiver = DroneVideoReceiver(target_gui=hexsoon_gui)
-        mission_planner = MissionPlanner(target_gui=hexsoon_gui)
-        mqtt = MQTT(target_gui=hexsoon_gui)
+        receiver = DroneVideoReceiver(target_gui = hexsoon_gui)
+        mission_planner = MissionPlanner(target_gui = hexsoon_gui)
+        mqtt = MQTT(target_gui = hexsoon_gui)
+        video = ServiceVideo(target_gui = hexsoon_gui)
 
-        threading.Thread(target=receiver.start, daemon=True).start()
-        threading.Thread(target=mission_planner._mission_loop, daemon=True).start()
-        threading.Thread(target=mqtt.run_loop, daemon=True).start()
+        threading.Thread(target = receiver.start, daemon = True).start()
+        threading.Thread(target = mission_planner._mission_loop, daemon = True).start()
+        threading.Thread(target = mqtt.run_loop, daemon = True).start()
+        threading.Thread(target = video.start, daemon= True).start()
         
         hexsoon_gui.update_frame()
 
@@ -32,7 +35,7 @@ def main():
             receiver.running = False
             mission_planner.running = False
             mission_planner.stop()
-            hexsoon_gui.cleanup()
+            hexsoon_gui.on_close()
             root.destroy()
 
         root.protocol("WM_DELETE_WINDOW", on_closing)

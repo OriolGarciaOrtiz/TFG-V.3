@@ -23,37 +23,34 @@ class GUI:
 
         init(autoreset=True)
 
-        # Thread-safe queues
+        self.FPS = 45
+
         self.video_queue = queue.Queue(maxsize=2)
-        self.velocity_queue = queue.Queue(maxsize=10)
-        self.mission_queue = queue.Queue(maxsize=2)
 
         self.user32 = ctypes.windll.user32
         self.PrintWindow = self.user32.PrintWindow
 
-        # Thread control
         self.running = True
 
         self.presets, self.color_menu = self.load_colors("colors.txt")
 
+        self.frames_to_show = None
+
         self.setup_gui()
+
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
         self.color_values = {
             "Color 1": {"preset": "Green", "h_min": 35, "h_max": 85, "s_min": 55, "s_max": 255, "v_min": 100, "v_max": 255},
             "Color 2": {"preset": "Blue",  "h_min": 85, "h_max": 135, "s_min": 100, "s_max": 255, "v_min": 100, "v_max": 255},
         }
 
-        # Start threads
-        self.thread_video = threading.Thread(target=self.thread_video_func, daemon=True)
-        self.thread_velocities = threading.Thread(target=self.thread_velocities_func, daemon=True)
         self.thread_get_frame = threading.Thread(target=self.thread_get_frame_func, daemon=True)
 
-        self.thread_video.start()
-        self.thread_velocities.start()
         self.thread_get_frame.start()
 
-        # Start main update loop
         self.update_frame()
+
 
     def setup_gui(self):
         self.root.title("Hexsoon Drone Controller")
@@ -66,6 +63,7 @@ class GUI:
         self.create_pid_controls()
         self.create_velocity_display()
         self.create_zoom_slider()
+
 
     def run_in_thread(self, target_func, status_msg="Executing..."):
         """Helper to run actions in background threads"""
@@ -84,6 +82,7 @@ class GUI:
         thread.start()
         return thread
 
+
     def create_connection_widgets(self):
         self.connected_label = Label(self.root, text="Not Connected", font=("Arial", 14))
         self.connected_label.grid(row=0, column=0, padx=10, pady=10)
@@ -95,6 +94,7 @@ class GUI:
 
         self.battery_label = Label(self.root, text="Battery: -", font=("Arial", 14))
         self.battery_label.grid(row=0, column=2, padx=10, pady=10)
+
 
     def load_colors(self, path: str):
         presets = {}
@@ -114,18 +114,10 @@ class GUI:
 
         return presets, names
 
-
     
     def apply_color_preset(self, *args):
         preset = self.color_opt.get()
-        self.presets = {
-            "Green":  (35, 85, 55, 255, 100, 255),
-            "Pink":   (140, 170, 20, 255, 100, 255),
-            "Blue":   (85, 135, 100, 255, 100, 255),
-            "Oranje": (0, 30, 160, 255, 100, 255),         # 0, 10, 90, 255, 100, 255
-            "Yellow": (0, 30, 0, 255, 23, 255),
-            "Clouded Yellow": (0, 49, 0, 255, 23, 255)
-        }
+
         values = self.presets.get(preset)
         if not values:
             return
@@ -149,6 +141,7 @@ class GUI:
             "v_min": vmin, "v_max": vmax
         }
 
+
     def switch_color(self, *_):
         selected = self.color_sel.get()
         values = self.color_values.get(selected)
@@ -169,6 +162,7 @@ class GUI:
         self.color_opt.set(values.get("preset", "Green"))
 
         self.updating_sliders = False
+
 
     def create_color(self):
         window = tk.Toplevel(self.root)
@@ -212,9 +206,6 @@ class GUI:
                 length=220
             ).grid(row=i, column=1, padx=10)
 
-        # -------------------------
-        # Create + save
-        # -------------------------
         def create():
             name = name_entry.get().strip()
             if not name:
@@ -248,6 +239,7 @@ class GUI:
             pady=12
         )
 
+
     def refresh_color_menu(self):
         menu = self.color_menu_widget["menu"]
         menu.delete(0, "end")
@@ -257,7 +249,6 @@ class GUI:
                 label=color,
                 command=lambda value=color: self.color_opt.set(value)
             )
-
 
 
     def create_control_buttons(self):
@@ -271,7 +262,7 @@ class GUI:
         color_selection.grid(row=7, column=0, padx=10, pady=10)
 
         self.create_color_button = tk.Button(self.root, text="Create Color",
-                                         command=lambda: self.run_in_thread(self.create_color))
+                                         command=lambda: self.create_color())
         self.create_color_button.grid(column=0, row=8, padx=10, pady=10)
 
         self.color_opt.trace_add("write", self.apply_color_preset)
@@ -279,7 +270,7 @@ class GUI:
 
         self.takeoff_height = tk.Entry(self.root, width=10)
         self.takeoff_height.insert(0, "2")
-        self.takeoff_height.grid(column=4, row=1, padx=10, pady=10)
+        self.takeoff_height.grid(column=2, row=1, padx=10, pady=10)
 
         # Take off button - use controller.take_off_drone directly
         self.take_off_button = tk.Button(self.root, text="Arm and Take-off",
@@ -305,6 +296,7 @@ class GUI:
                                         command=lambda: self.run_in_thread(self.controller.load_model))
         self.load_model_button.grid(column=8, row=1, padx=10, pady=10)
 
+
     def create_mode_selectors(self):
         self.simulation_var = tk.StringVar(value="Simulation")
         simulation_dropdown = tk.OptionMenu(self.root, self.simulation_var,
@@ -328,14 +320,15 @@ class GUI:
         Mode_cam = ["Front View", "Bottom View"]
         self.opt_cam = tk.StringVar(value="Bottom View")
         dropdown_mode = tk.OptionMenu(self.root, self.opt_cam, *Mode_cam)
-        dropdown_mode.grid(row=0, column=9, padx=9, pady=10)
-        Label(self.root, text="Mode used =", font=("Arial", 14)).grid(row=0, column=8, padx=10, pady=10)
+        dropdown_mode.grid(row=1, column=5, padx=9, pady=10)
+        Label(self.root, text="Mode used =", font=("Arial", 14)).grid(row=1, column=4, padx=10, pady=10)
 
         Label(self.root, text="Camera Used =", font=("Arial", 14)).grid(row=1, column=6, padx=10, pady=10)
         Opt_cam = ["Default Cam", "Raspi Cam", "Panoramic Cam"]
         self.camera_option = tk.StringVar(value="Default Cam")
         dropdown_cam_opt = tk.OptionMenu(self.root, self.camera_option, *Opt_cam)
         dropdown_cam_opt.grid(row=1, column=7, padx=9, pady=10)
+
 
     def create_pid_controls(self):
         self.Kp_x = tk.DoubleVar(value=0.1)
@@ -355,6 +348,7 @@ class GUI:
                                    orient="horizontal", variable=self.max_velocity,
                                    length=200)
         velocity_slider.grid(row=8, column=3)
+
 
     def create_pid_slider_set(self, axis, y_pos):
         kp_label = tk.Label(self.root, text=f"Kp-{axis} (Proportional)")
@@ -380,6 +374,7 @@ class GUI:
         kd_slider = tk.Scale(self.root, from_=0, to=5, resolution=0.1,
                              orient="horizontal", variable=kd_var, length=200)
         kd_slider.place(x=1200, y=y_pos + 25)
+
 
     def create_hsv_sliders(self):
         self.h_min, self.h_max = tk.IntVar(value=35), tk.IntVar(value=85)
@@ -432,6 +427,7 @@ class GUI:
         )
         zoom_slider.grid(row=9, column=1, padx=10, pady=5)
 
+
     def create_velocity_display(self):
         self.lr_label = Label(self.root, text="Left-Right Velocity = 0", font=("Arial", 14))
         self.lr_label.grid(column=3, row=3)
@@ -441,6 +437,7 @@ class GUI:
         self.ud_label.grid(column=3, row=5)
         self.yaw_label = Label(self.root, text="Yaw Velocity = 0", font=("Arial", 14))
         self.yaw_label.grid(column=3, row=6)
+
 
     def create_video_panels(self):
         container = tk.Frame(self.root)
@@ -474,6 +471,7 @@ class GUI:
         mission_lbl.pack(pady=(0, 30))
         self.video_labels.append(mission_lbl)
 
+
     def transfer_data(self):
         """Transfer GUI settings to controller"""
         primary = self.color_values.get("Color 1", {})
@@ -504,62 +502,6 @@ class GUI:
         self.controller.camera_option = self.camera_option.get()
         self.controller.zoom_factor = self.zoom_var.get()
 
-    def thread_video_func(self):
-        """Thread for processing and displaying video frames"""
-
-        while self.running:
-            try:
-                # Check if GUI is still alive
-                if not hasattr(self, 'root') or not self.root.winfo_exists():
-                    break
-
-                # Get frames from queue
-                if not self.video_queue.empty():
-                    original_frame, detected_frame = self.video_queue.get(timeout=0.1)
-
-                    # Convert frames for display
-                    frames_to_show = []
-                    for frame in [original_frame, detected_frame]:
-                        if frame is not None:
-                            # Convert BGR to RGB for PIL if needed
-                            if len(frame.shape) == 3 and frame.shape[2] == 3:
-                                try:
-                                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                                except:
-                                    pass
-                            frames_to_show.append(frame)
-                        else:
-                            # Create black frame as placeholder
-                            black_frame = np.zeros((self.controller.panel_height, self.controller.panel_width, 3),
-                                                   dtype=np.uint8)
-                            frames_to_show.append(black_frame)
-
-                    # Get mission planner frame from stored attribute
-                    mission_frame = getattr(self, 'mission_frame', None)
-
-                    if mission_frame is None:
-                        # Show placeholder if no mission frame available
-                        mission_frame = np.zeros((self.misson_panel_width, self.misson_panel_heigth, 3), dtype=np.uint8)
-                        cv2.putText(mission_frame, "Mission Planner not found",
-                                    (20, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-
-                    else:
-                        mission_frame = cv2.cvtColor(mission_frame, cv2.COLOR_BGR2RGB)
-
-                    frames_to_show.append(mission_frame)
-
-                    # Update GUI in main thread
-                    self.root.after(0, self.update_video_frames, frames_to_show)
-
-                time.sleep(0.033)  # ~30 FPS
-
-            except tk.TclError:
-                break
-            except queue.Empty:
-                time.sleep(0.01)
-            except Exception as e:
-                print(Fore.RED + f"Video thread error: {e}")
-                time.sleep(0.1)
 
     def update_video_frames(self, frames):
         """Update video frames in main thread (Tkinter safe)"""
@@ -572,29 +514,6 @@ class GUI:
         except Exception as e:
             print(Fore.RED + f"Error updating video frames: {e}")
 
-    def thread_velocities_func(self):
-        """Thread for updating velocity displays"""
-        while self.running:
-            try:
-                # Get velocity data from queue
-                if not self.velocity_queue.empty():
-                    lr, fb, ud, yaw = self.velocity_queue.get(timeout=0.1)
-                    self.controller.left_right = lr
-                    self.controller.for_back = fb
-                    self.controller.up_down = ud
-                    self.controller.yaw = yaw
-
-                    # Update GUI in main thread
-                    self.controller.set_velocity()
-                    self.root.after(0, self.update_velocity_labels)
-
-                time.sleep(0.05)
-
-            except queue.Empty:
-                time.sleep(0.01)
-            except Exception as e:
-                print(Fore.RED + f"Velocity thread error: {e}")
-                time.sleep(0.1)
 
     def update_velocity_labels(self):
         """Update velocity labels in main thread"""
@@ -604,33 +523,28 @@ class GUI:
         self.ud_label.config(text=f"Up-Down Velocity = {self.controller.up_down:.2f}")
         self.yaw_label.config(text=f"Yaw Velocity = {self.controller.yaw:.2f}")
 
+
     def thread_get_frame_func(self):
-        """Thread for getting camera frames"""
+
         while self.running:
             try:
                 original_frame, detected_frame = None, None
                 if self.controller.is_connected:
                     original_frame, detected_frame = self.controller.get_frame()
 
-                if not self.video_queue.full():
-                    self.video_queue.put((original_frame, detected_frame), timeout=0.1)
+                while not self.video_queue.empty():
+                    self.video_queue.get_nowait()
 
-                # Put velocity data in queue
-                if not self.velocity_queue.full():
-                    self.velocity_queue.put((
-                        self.controller.left_right,
-                        self.controller.for_back,
-                        self.controller.up_down,
-                        self.controller.yaw
-                    ), timeout=0.1)
+                self.video_queue.put((original_frame, detected_frame))
 
-                time.sleep(0.033)  # ~30 FPS
+                time.sleep(1/self.FPS)
 
             except queue.Full:
-                time.sleep(0.01)
+                time.sleep(1/self.FPS)
             except Exception as e:
                 print(Fore.RED + f"Frame thread error: {e}")
-                time.sleep(0.1)
+                time.sleep(1/self.FPS)
+
 
     def update_frame(self):
         try:
@@ -648,10 +562,18 @@ class GUI:
 
             self.connected_label.config(text=status_text, fg=color)
 
+            if self.frames_to_show:
+            
+                self.update_video_frames(self.frames_to_show)
+
+            self.update_velocity_labels()
+
         except Exception as e:
             print(Fore.RED + f"Error in update_frame: {e}")
 
         self.root.after(30, self.update_frame)
 
-    def cleanup(self):
+
+    def on_close(self):
         self.running = False
+        self.root.after(100, self.root.destroy)

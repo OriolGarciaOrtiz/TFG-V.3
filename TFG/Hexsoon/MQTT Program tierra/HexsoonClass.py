@@ -437,21 +437,17 @@ class HexsoonController:
             )
             return None, img_contour
 
-    def get_velocities(self, oject_center): #OJO, modificado
-
-        '''
-            Returns the camputed velocities to be sent to the simulator.
-        '''
+    def get_velocities(self, oject_center):
 
         if oject_center is not None:
 
             cx, cy = oject_center
-            error_x = self.panel_width / 2 -cx #Cambiado. Mirar si en bottom view tiene que ser tambien así o hay que cambiarlo
+            error_x = self.panel_width / 2 -cx
             error_y = self.panel_height / 2 - cy
 
             derivative_x = error_x - self.prev_error_x
             derivative_y = error_y - self.prev_error_y
-            self.prev_error_x = error_x #OJO, hay que guardarse el anterior y no lo habíamos hecho
+            self.prev_error_x = error_x
             self.prev_error_y = error_y
 
             if self.PID_mode == "P":
