@@ -58,7 +58,7 @@ class HexsoonController:
 
         self.try_mode = "Practice"
 
-        self.camera_option = "Default Cam"
+        self.type_camera_option = "Default Cam"
 
         self.click_connect = False
         self.click_disconnect = False
@@ -100,7 +100,8 @@ class HexsoonController:
 
         archivo = filedialog.askopenfilename(
             title="Seleccionar archivo",
-            initialdir="Yolo Models"
+            initialdir="Yolo Models",
+            filetypes=[("PyTorch model (*.pt)", "*.pt")]
         )
 
         try: 
@@ -584,7 +585,7 @@ class HexsoonController:
 
         try:
 
-            original_frame, detected_frame = self.cap_frame(self.camera_option)
+            original_frame, detected_frame = self.cap_frame(self.type_camera_option)
 
             if original_frame is None:
                 return None, None

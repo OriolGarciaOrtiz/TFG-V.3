@@ -26,7 +26,7 @@ class MQTT:
 
 
     def on_message(self, client, userdata, msg):
-        if self.target_gui.controller.camera_option == "Raspi Cam":
+        if self.target_gui.controller.type_camera_option == "Raspi Cam":
             text = msg.payload.decode('utf-8')
             self.set_data(text)
             pass
@@ -56,11 +56,11 @@ class MQTT:
             'v_max': self.target_gui.v_max.get(),
 
             # Detection and modes
-            'detection_mode': self.target_gui.detection_var.get(),
-            'view_mode': self.target_gui.opt_cam.get(),
-            'try_mode': self.target_gui.simulation_var.get(),
-            'PID_mode': self.target_gui.opt.get(),
-            'camera_option': self.target_gui.camera_option.get(),
+            'detection_mode': self.target_gui.detection_selection.get(),
+            'view_mode': self.target_gui.view_selection.get(),
+            'try_mode': self.target_gui.test_selection.get(),
+            'PID_mode': self.target_gui.controller_selection.get(),
+            'camera_option': self.target_gui.type_camera_option.get(),
 
             # PID values
             'Kp_x': self.target_gui.Kp_x.get(),
@@ -98,6 +98,6 @@ class MQTT:
 
     def run_loop(self):
         while True:
-            if self.target_gui.camera_option.get() == "Raspi Cam":
+            if self.target_gui.type_camera_option.get() == "Raspi Cam":
                 self.send_data()
             time.sleep(0.5)

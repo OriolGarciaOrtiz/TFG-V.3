@@ -293,36 +293,30 @@ class GUI:
 
 
     def create_mode_selectors(self):
-        self.simulation_var = tk.StringVar(value="Simulation")
-        simulation_dropdown = tk.OptionMenu(self.root, self.simulation_var,
-                                            "Simulation", "Practice")
-        simulation_dropdown.grid(row=0, column=3, padx=10, pady=10)
+        self.test_selection = tk.StringVar(value="Simulation")
+        test_menu = tk.OptionMenu(self.root, self.test_selection, "Simulation", "Practice")
+        test_menu.grid(row=0, column=3, padx=10, pady=10)
 
-        detection_label = tk.Label(self.root, text="Detection Mode:", font=("Arial", 14))
-        detection_label.grid(row=0, column=4, padx=(20, 5), pady=10)
+        tk.Label(self.root, text="Detection Mode:", font=("Arial", 14)).grid(row=0, column=4, padx=(20, 5), pady=10)
+        self.detection_selection = tk.StringVar(value="Color Contour")
+        detection_menu = tk.OptionMenu(self.root, self.detection_selection, "Color Contour", "Neural Network")
+        detection_menu.grid(row=0, column=5, padx=10, pady=10)
 
-        self.detection_var = tk.StringVar(value="Color Contour")
-        detection_dropdown = tk.OptionMenu(self.root, self.detection_var,
-                                           "Color Contour", "Neural Network")
-        detection_dropdown.grid(row=0, column=5, padx=10, pady=10)
-
-        PID_values = ["P", "I", "D", "PD", "PI", "PID", "None"]
         Label(self.root, text="Controller used =", font=("Arial", 14)).grid(row=0, column=6, padx=10, pady=10)
-        self.opt = tk.StringVar(value="PID")
-        dropdown_x = tk.OptionMenu(self.root, self.opt, *PID_values)
-        dropdown_x.grid(row=0, column=7, padx=10, pady=10)
+        self.controller_selection = tk.StringVar(value="PID")
+        controller_menu = tk.OptionMenu(self.root, self.controller_selection, "P", "I", "D", "PD", "PI", "PID", "None")
+        controller_menu.grid(row=0, column=7, padx=10, pady=10)
 
-        Mode_cam = ["Front View", "Bottom View"]
-        self.opt_cam = tk.StringVar(value="Bottom View")
-        dropdown_mode = tk.OptionMenu(self.root, self.opt_cam, *Mode_cam)
-        dropdown_mode.grid(row=1, column=5, padx=9, pady=10)
         Label(self.root, text="Mode used =", font=("Arial", 14)).grid(row=1, column=4, padx=10, pady=10)
+        self.view_selection = tk.StringVar(value="Bottom View")
+        view_menu = tk.OptionMenu(self.root, self.view_selection, "Front View", "Bottom View")
+        view_menu.grid(row=1, column=5, padx=9, pady=10)
+
 
         Label(self.root, text="Camera Used =", font=("Arial", 14)).grid(row=1, column=6, padx=10, pady=10)
-        Opt_cam = ["Default Cam", "Raspi Cam", "Panoramic Cam"]
-        self.camera_option = tk.StringVar(value="Default Cam")
-        dropdown_cam_opt = tk.OptionMenu(self.root, self.camera_option, *Opt_cam)
-        dropdown_cam_opt.grid(row=1, column=7, padx=9, pady=10)
+        self.type_camera_option = tk.StringVar(value="Default Cam")
+        type_camera_menu = tk.OptionMenu(self.root, self.type_camera_option, "Default Cam", "Raspi Cam", "Panoramic Cam")
+        type_camera_menu.grid(row=1, column=7, padx=9, pady=10)
 
 
     def create_pid_controls(self):
@@ -443,13 +437,11 @@ class GUI:
         self.yaw_label.grid(column=3, row=6, sticky="w")
 
 
-
     def create_video_panels(self):
         container = tk.Frame(self.root)
         container.place(relx=0.5, rely=0.9, anchor="s", relwidth=1.0, height=400)
         self.video_labels = []
 
-        # Subframe HSV Mask
         hsv_frame = tk.Frame(container)
         hsv_frame.grid(row=0, column=0, padx=25)
         tk.Label(hsv_frame, text="HSV Mask", font=("Arial", 12)).pack(pady=(0, 2))
@@ -458,7 +450,6 @@ class GUI:
         hsv_lbl.pack()
         self.video_labels.append(hsv_lbl)
 
-        # Subframe Contour
         contour_frame = tk.Frame(container)
         contour_frame.grid(row=0, column=1, padx=25)
         tk.Label(contour_frame, text="Contour", font=("Arial", 12)).pack(pady=(0, 2))
@@ -467,7 +458,6 @@ class GUI:
         contour_lbl.pack()
         self.video_labels.append(contour_lbl)
 
-        # Subframe MissionPlanner
         mission_frame = tk.Frame(container)
         mission_frame.grid(row=0, column=2, padx=25)
         tk.Label(mission_frame, text="MissionPlanner", font=("Arial", 12)).pack(pady=(0, 5))
@@ -492,19 +482,19 @@ class GUI:
                 (secondary.get("h_max", 255), secondary.get("s_max", 255), secondary.get("v_max", 255))
             )
         }
-        self.controller.detection_mode = self.detection_var.get()
+        self.controller.detection_mode = self.detection_selection.get()
         self.controller.Kp_x = self.Kp_x.get()
         self.controller.Ki_x = self.Ki_x.get()
         self.controller.Kd_x = self.Kd_x.get()
         self.controller.Kp_y = self.Kp_y.get()
         self.controller.Ki_y = self.Ki_y.get()
         self.controller.Kd_y = self.Kd_y.get()
-        self.controller.PID_mode = self.opt.get()
+        self.controller.PID_mode = self.controller_selection.get()
         self.controller.max_velocity = self.max_velocity.get()
-        self.controller.view_mode = self.opt_cam.get()
+        self.controller.view_mode = self.view_selection.get()
         self.controller.take_off_alt = float(self.takeoff_height.get())
-        self.controller.try_mode = self.simulation_var.get()
-        self.controller.camera_option = self.camera_option.get()
+        self.controller.try_mode = self.test_selection.get()
+        self.controller.type_camera_option = self.type_camera_option.get()
         self.controller.zoom_factor = self.zoom_var.get()
 
 
@@ -552,6 +542,7 @@ class GUI:
 
 
     def update_frame(self):
+
         try:
 
             self.transfer_data()
@@ -582,3 +573,4 @@ class GUI:
     def on_close(self):
         self.running = False
         self.root.after(100, self.root.destroy)
+

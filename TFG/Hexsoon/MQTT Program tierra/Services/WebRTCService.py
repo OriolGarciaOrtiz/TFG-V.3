@@ -134,7 +134,7 @@ class DroneVideoReceiver:
     def should_connect_rtc(self) -> bool:
         return (
             self.gui.controller.try_mode in ("Practice", "Simulation") and
-            self.gui.controller.camera_option in ("Raspi Cam")
+            self.gui.controller.type_camera_option in ("Raspi Cam")
         )
     
     async def disconnect_from_drone(self):

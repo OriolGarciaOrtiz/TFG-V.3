@@ -156,7 +156,7 @@ class MissionPlanner:
         while self.running:
             frame = None
             try:
-                mode = self.target_gui.simulation_var.get()
+                mode = self.target_gui.test_selection.get()
                 if mode == "Simulation":
                     frame = self.capture_mission_planner()
                 elif mode == "Practice":
