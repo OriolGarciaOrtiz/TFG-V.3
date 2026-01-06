@@ -516,6 +516,11 @@ class GUI:
 
         mode = self.game_mode
 
+        if mode in ["Color Contour", "Color Game Mode"]:
+
+            self.load_button.grid_forget()
+            self.load_button.place_forget()
+
         if mode in ("Color Contour", "Neural Network"):
 
             for lbl, sld, row in self.hsv_slider_rows:
