@@ -2,6 +2,7 @@ from ultralytics import YOLO
 from djitellopy import Tello
 import os
 import threading
+import tkinter as tk
 from tkinter import filedialog
 
 
@@ -47,11 +48,12 @@ class DroneController:
         else:
             print("[DroneController] Drone not connected. Cannot go up.")
 
-    def load_model(self):
+    def load_yolo_model(self):
 
         archivo = filedialog.askopenfilename(
             title="Seleccionar archivo",
-            initialdir="Yolo Models"
+            initialdir="Yolo Models",
+            filetypes=[("PyTorch model (*.pt)", "*.pt")]
         )
 
         try: 
@@ -62,16 +64,3 @@ class DroneController:
         except:
 
             print("Error loading YOLO model")
-
-
-    def drone_connection(self):
-        try:
-            self.me.connect()
-            self.is_connected = True
-            self.me.streamoff()
-            self.me.streamon()
-            print(f"Connected! Battery: {self.me.get_battery()}%")
-
-        except Exception as e:
-            self.is_connected = False
-            print("Connection failed:", e)

@@ -23,22 +23,23 @@ class GUI:
 
         self.controller = DroneController()
 
-        self.yolo_frame = None
 
-        self.yolo_result = (None, 0, 0, None, [])
+        self.yolo_queue = Queue(maxsize=1) #Cola con capacidad de un frame
+        self.yolo_result = (None, 0, 0, []) #Inizializamos lo que tiene que devolver la función para cuando sea vacio
+        self.yolo_lock = threading.Lock()
 
-        self.distance = None
 
-        self.object_center = None
-        self.img_display = None
-        self.w = 0
-        self.h = 0
-        self.gray_highres = None
-        self.img_contour = None
-        self.camera_matrix = None
-        self.dist_coeffs = None
+        self._yolo_worker = threading.Thread(target=self._yolo_worker_loop, daemon=True) #Dejamos de forma infinita recorrer esta función en segundo plano
+        self._yolo_worker.start()
 
-        self.detected_color = None
+        self.game_mode = mode
+
+        self.game_queue = Queue(maxsize=1)
+        self.game_result = (None, 0, 0, None,[])
+        self.game_lock = threading.Lock()
+
+        self._game_worker = threading.Thread(target=self._game_worker_loop, daemon=True)
+        self._game_worker.start()
 
         #GeoTracker
         lat1=41.2754531
@@ -60,6 +61,7 @@ class GUI:
         self.tracker.open_map_window()
 
         self.last_position_time = time.time()
+
 
         try:
             file_path = r"taller-dron-Tello\Lib\Parameters\parametros_camara_tello.npz"
@@ -96,7 +98,7 @@ class GUI:
 
         self.last_detection_mode = None
 
-        self.detection_var = mode
+
 
         self.hsv_widgets = []
         self.hsv_slider_rows = []
@@ -144,23 +146,6 @@ class GUI:
         self.create_velocity_display()
         self.create_distance_controls()
 
-    def run_in_thread(self, target_func, status_msg="Executing..."):
-        """Helper to run actions in background threads"""
-
-        def task():
-            try:
-                print(status_msg)
-                result = target_func()
-                print("Action complete")
-                return result
-            except Exception as e:
-                print(f"Error: {str(e)}")
-
-        # Start the thread
-        thread = threading.Thread(target=task, daemon=True)
-        thread.start()
-        return thread
-
     def create_connection_widgets(self):
         # Connection status
         self.connected_label = Label(self.root, text="Not Connected", font=("Arial", 12))
@@ -184,10 +169,6 @@ class GUI:
 
         self.emergency_button = tk.Button(self.root, text="Emergency", command=self.controller.emergency)
         self.emergency_button.grid(row=0,column=7)
-
-        self.load_model_button = tk.Button(self.root, text="Load Yolo model", 
-                                        command=lambda: self.run_in_thread(self.controller.load_model))
-        self.load_model_button.grid(column=8, row=2, padx=10, pady=10)
 
     def create_map_widget(self):
         map_frame = tk.LabelFrame(self.root, text="Mapa GEO", padx=5, pady=5)
@@ -233,6 +214,9 @@ class GUI:
         dropdown_mode = OptionMenu(self.root, self.opt_cam, *Mode_cam)
         dropdown_mode.grid(row=0, column=9)
         Label(self.root, text="Mode used =", font=("Arial", 12)).grid(row=0, column=8)
+
+        self.load_button = tk.Button(self.root, text="Load Yolo Model", command = self.controller.load_yolo_model)
+        self.load_button.grid(row=2, column=8)
 
     def create_pid_controls(self):
         # Initialize PID variables
@@ -320,10 +304,12 @@ class GUI:
             title_label = Label(video_frame, text=title, font=("Arial", 11, "bold"))
             title_label.grid(row=0, column=i, padx=15, pady=(5, 2))
 
-            lbl = Label(video_frame, width=self.panel_width // 8,
-                        height=self.panel_height // 16, relief='sunken',
-                        bd=1, bg='black'
-            )
+            lbl = Label(video_frame,
+                        width=self.panel_width // 8,
+                        height=self.panel_height // 16,
+                        relief='sunken',
+                        bd=1,
+                        bg='black')
             lbl.grid(row=1, column=i, padx=15, pady=10, sticky="nsew")
             self.video_labels.append(lbl)
 
@@ -351,7 +337,8 @@ class GUI:
 
         for var, text, row in sliders_config:
             lbl = tk.Label(self.root, text=text, font=("Arial", 12))
-            sld = tk.Scale(self.root, from_=0, to=255, orient="horizontal", variable=var, length=175)
+            sld = tk.Scale(self.root, from_=0, to=255, orient="horizontal",
+                           variable=var, length=175)
 
             lbl.grid(row=row, column=0)
             sld.grid(row=row, column=1)
@@ -373,19 +360,15 @@ class GUI:
             self.blue_box, self.blue_label
         ]
 
-        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-        FOTOS_DIR = os.path.join(BASE_DIR, "Fotos")
-
-        def load_img(filename):
-            path = os.path.join(FOTOS_DIR, filename)
+        def load_img(path):
             img = Image.open(path)
-            img = img.resize((75, 75), Image.Resampling.LANCZOS)
+            img = img.resize((75, 75), Image.Resampling.LANCZOS)  # redimensiona
             return ImageTk.PhotoImage(img)
 
-        self.horse_img = load_img("horse.jpg")
-        self.bird_img = load_img("bird.jpg")
-        self.dog_img = load_img("dog.jpg")
-        self.cat_img = load_img("cat.jpg")
+        self.horse_img = load_img("Fotos/horse.jpg")
+        self.bird_img = load_img("Fotos/bird.jpg")
+        self.dog_img = load_img("Fotos/dog.jpg")
+        self.cat_img = load_img("Fotos/cat.jpg")
 
         animal_images = [
             self.horse_img,
@@ -455,7 +438,7 @@ class GUI:
 
     def create_distance_controls(self):
         distance_methods = ["Distance by ratio", "Distance by ArUco", "Distance by pinhole", "Manual distance"]
-        self.opt_dist_method = StringVar(value="Distance by ratio")
+        self.opt_dist_method = StringVar(value="Manual distance")
 
         Label(self.root, text="Distance Method:", font=("Arial", 12)).grid(row=3, column=8)
         dropdown_dist = OptionMenu(self.root, self.opt_dist_method, *distance_methods,
@@ -531,7 +514,7 @@ class GUI:
             frame.place_forget()
             dd.place_forget()
 
-        mode = self.detection_var
+        mode = self.game_mode
 
         if mode in ("Color Contour", "Neural Network"):
 
@@ -610,6 +593,26 @@ class GUI:
             elif action == "Landing":
                 self.block_PID = True
                 threading.Thread(target=self.controller.me.land).start()
+
+    def drone_connection(self):
+        try:
+            self.controller.me.connect()
+            self.controller.is_connected = True
+            self.controller.me.streamoff()
+            self.controller.me.streamon()
+            print(f"Connected! Battery: {self.controller.me.get_battery()}%")
+            self.connected_label.config(text="Connected", fg="green")
+
+            #if not self.flask_server:
+                #print("Starting Flask server on port 5000...")
+                #self.flask_server = FlaskServer(host="0.0.0.0", port=5000)
+                #self.flask_server.start()
+
+            self.update_frame()
+        except Exception as e:
+            self.controller.is_connected = False
+            print("Connection failed:", e)
+            self.connected_label.config(text="Not Connected", fg="red")
 
     def get_maunal_distance(self):
 
@@ -806,6 +809,175 @@ class GUI:
                       (cx + w // 2, cy + h // 2), color_bgr, 2)
         return (cx, cy), w, h, detected_color
 
+    def _yolo_worker_loop(self):
+        while True:
+            frame = self.yolo_queue.get()
+            try:
+                detection_mode = self.game_mode
+                if detection_mode == "Neural Network":
+                    results = self.controller.model.predict(frame, conf=0.2, verbose=False)
+
+                object_center, w, h, boxes_info = self._process_yolo_result(results)
+
+                with self.yolo_lock:
+                    self.yolo_result = (object_center, w, h, boxes_info)
+
+            except Exception as e:
+                print("[ERROR] YOLO worker:", e)
+                with self.yolo_lock:
+                    self.yolo_result = (None, 0, 0, [])
+
+    def _process_yolo_result(self, results):
+        object_center = None
+        w = h = 0
+        max_area = 0
+        boxes_info = []  # [(x1, y1, x2, y2, label, conf)]
+
+        for r in results:
+            for box in r.boxes:
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                w_box, h_box = x2 - x1, y2 - y1
+                area = w_box * h_box
+                conf = float(box.conf[0])
+                detection_mode = self.game_mode
+                if detection_mode == "Neural Network":
+                    label = self.controller.model.names[int(box.cls[0])] \
+                        if hasattr(self.controller.model, "names") else str(int(box.cls[0]))
+
+                boxes_info.append((x1, y1, x2, y2, label, conf))
+
+                if area > max_area:
+                    max_area = area
+                    w, h = w_box, h_box
+                    object_center = (x1 + w_box // 2, y1 + h_box // 2)
+
+        return object_center, int(w), int(h), boxes_info
+
+    def _game_worker_loop(self):
+        while True:
+            frame = self.game_queue.get()
+            try:
+                results = self.controller.model.predict(frame, conf=0.5, verbose=False)
+                object_center, w, h, label_name, boxes_info = self._process_game_result(results)
+
+                with self.game_lock:
+                    self.game_result = (object_center, w, h, label_name, boxes_info)
+            except Exception as e:
+                print("[ERROR] GAME worker:", e)
+                with self.game_lock:
+                    self.game_result = (None, 0, 0, None, [])
+
+    def _process_game_result(self, results):
+        max_area = 0
+        best_box = None
+        detected_label = None
+        boxes_info = []  # [(x1, y1, x2, y2, label_name, conf)]
+
+        for r in results:
+            for box in r.boxes:
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                w_box, h_box = x2 - x1, y2 - y1
+                area = w_box * h_box
+                conf = float(box.conf[0])
+                cls_id = int(box.cls[0])
+                label_map = {0: "horse", 1: "bird", 2: "dog", 3: "cat"}
+                label_name = label_map.get(cls_id, "unknown")
+                boxes_info.append((x1, y1, x2, y2, label_name, conf))
+
+                if area > max_area:
+                    max_area = area
+                    best_box = (x1, y1, x2, y2)
+                    detected_label = label_name
+
+        if best_box is not None:
+            x1, y1, x2, y2 = best_box
+            w, h = x2 - x1, y2 - y1
+            cx, cy = x1 + w // 2, y1 + h // 2
+            object_center = (cx, cy)
+            return object_center, w, h, detected_label, boxes_info
+
+        return None, 0, 0, None, boxes_info
+
+    def distance_by_ratio(self, img_display, object_center, w, h):
+        ratio_width = 5.2 / 5.5
+        ratio_height = 1.2
+        focal_length_width = img_display.shape[0] / ratio_width
+        focal_length_height = img_display.shape[1] / ratio_height
+        obj_height = float(self.entry_height.get()) if self.entry_height.get() else 27.0
+        obj_width = float(self.entry_width.get()) if self.entry_width.get() else 20.0
+
+        if object_center and obj_width and obj_height and w and h:
+            dist_to_camera_width = float(obj_width) * focal_length_width / w * 2 - 22
+            dist_to_camera_height = float(obj_height) * focal_length_height / h * 2 - 22
+            distance = (dist_to_camera_width + dist_to_camera_height) / 2
+            self.dist_label.config(text="Distance to Object: " + str(distance.__round__(0)))
+            return distance.__round__(0)
+        else:
+            self.dist_label.config(text="[Ratio] Distance: --")
+            return None
+
+    def distance_by_aruco(self, gray_highres, img_contour, camera_matrix, dist_coeffs):
+        dictionary = aruco.getPredefinedDictionary(aruco.DICT_5X5_100)
+        detector = aruco.ArucoDetector(dictionary)
+        corners, ids, rejected = detector.detectMarkers(gray_highres)
+
+        if ids is not None:
+            aruco.drawDetectedMarkers(img_contour, corners, ids)
+            marker_length_cm = float(self.marker_length_entry.get()) if self.marker_length_entry.get() else 6
+            marker_length = marker_length_cm / 100  # m
+
+            for i in range(len(ids)):
+                obj_points = np.array([
+                    [-marker_length / 2, -marker_length / 2, 0],
+                    [marker_length / 2, -marker_length / 2, 0],
+                    [marker_length / 2, marker_length / 2, 0],
+                    [-marker_length / 2, marker_length / 2, 0]
+                ], dtype=np.float32)
+
+                ret, rvec, tvec = cv2.solvePnP(obj_points, corners[i], camera_matrix, dist_coeffs)
+                cv2.drawFrameAxes(img_contour, camera_matrix, dist_coeffs, rvec, tvec, 0.05)
+                distance = float(tvec[2]) * 100  # cm
+                self.dist_label.config(text=f"[ArUco] Distance: {distance:.2f} cm")
+
+                return distance
+        else:
+            self.dist_label.config(text="[ArUco] No marker visible")
+            return None
+
+    def distance_by_pinhole(self, camera_matrix, w, h):
+        W_real = float(self.entry_width.get()) if self.entry_width.get() else 20.5
+        H_real = float(self.entry_height.get()) if self.entry_height.get() else 27.5
+        scale_x = 640 / self.panel_width
+        scale_y = 480 / self.panel_height
+        w_scaled = w * scale_x if w else 0
+        h_scaled = h * scale_y if h else 0
+
+        if w_scaled > 0 and h_scaled > 0:
+            fx = camera_matrix[0, 0]
+            fy = camera_matrix[1, 1]
+            dist_width = (fx * W_real) / w_scaled
+            dist_height = (fy * H_real) / h_scaled
+            distance = (dist_width + dist_height) / 2
+            self.dist_label.config(text=f"[Pinhole] Distance: {distance:.2f} cm")
+            return distance
+        else:
+            self.dist_label.config(text="[Pinhole] No object detected")
+            return None
+
+
+    #El error es demasiado pequeño, para este metodo habría que subir los kp,i,d o hacer el error más grande multiplicando por 100 por ejemplo
+    def distance_by_hand(self, w ,h):
+        if w and h and self.w_det and self.h_det:
+            area = w * h
+            area_det = self.w_det * self.h_det
+            diff_area = area - area_det
+            self.dist_label.config(text=f"Area Error: {diff_area}")
+            if diff_area < 0:
+                return math.sqrt(abs(diff_area))
+            else:
+                return -math.sqrt(abs(diff_area))
+        else:
+            return None
 
     def check_distance_safety(self, cx, cy, w, h, distance):
         if cx is None or cy is None or w is None or h is None or distance is None:
@@ -845,9 +1017,6 @@ class GUI:
     def update_frame(self):
 
         if self.controller.is_connected:
-
-            self.connected_label.config(text="Connected", fg="green")
-
             self.battery_label.config(text=f"Battery: {self.controller.me.get_battery()}%", fg="blue")
             frame_read = self.controller.me.get_frame_read()
             my_frame = frame_read.frame
@@ -856,7 +1025,11 @@ class GUI:
             img_contour = img_display.copy()
             img_hsv = cv2.cvtColor(img_display, cv2.COLOR_BGR2HSV)
 
-            detection_mode = self.detection_var
+            object_center = None
+            distance = None
+            w, h = None, None
+            detected_color = None
+            detection_mode = self.game_mode
 
             if detection_mode == "Color Contour":
                 self.opt_cam.set("Drone Camera")
@@ -879,15 +1052,22 @@ class GUI:
                 img_dil = cv2.dilate(img_canny, kernel, iterations=1)
 
                 #detectar contornos y determinar color dominante
-                self.object_center, self.w, self.h, self.detected_color = self.detect_objects_color_contour_dual(
-                    mask_green, mask_blue, img_contour
-                )
+                object_center, w, h, detected_color = self.detect_objects_color_contour_dual(mask_green, mask_blue,
+                                                                                             img_contour)
 
             elif detection_mode == "Neural Network" and self.controller.model is not None:
-                
                 self.opt_cam.set("Mirror")
 
-                self.object_center, self.w, self.h, _, boxes_info = self.yolo_result
+                try:
+                    #.put_nowait lo que hace en la cola de un frame es:
+                    #Si esta cola está vacia entonces añadiremos a la cola el último frame y como el bucle de yolo_worker no para procesaremos esa imagen
+                    self.yolo_queue.put_nowait(img_contour.copy())
+                    print("Usando ultimo frame")
+                except queue.Full:
+                    pass #Si la cola está llena es porque el anterior frame todavía no se ha procesado ya que .predict tarda mucho en ejecutarse, entonces ignoraremos el nuevo frame y seguiremos trabajando con el anterior resultado/frame el cual ya estaba procesado
+                    print("YOLO ocupado: usando frame anterior")
+                with self.yolo_lock:
+                    object_center, w, h, boxes_info = self.yolo_result
 
                 if boxes_info:
                     for (x1, y1, x2, y2, label, conf) in boxes_info:
@@ -899,8 +1079,13 @@ class GUI:
             elif detection_mode == "Game Mode" and self.controller.model is not None:
                 self.opt_cam.set("Mirror")
                 self.block_PID = False
+                try:
+                    self.game_queue.put_nowait(img_contour.copy())
+                except queue.Full:
+                    pass
 
-                self.object_center, self.w, self.h, detected_label, boxes_info = self.yolo_result
+                with self.game_lock:
+                    object_center, w, h, detected_label, boxes_info = self.game_result
 
                 if boxes_info:
                     largest_box = max(
@@ -917,9 +1102,10 @@ class GUI:
                     detected_label = None
 
                 if detected_label is not None and detected_label != self.action_done_for_label:
-                    if detected_label in self.game_actions:
-                        action = self.game_actions[detected_label].get()
-                        self.execute_drone_action(action)
+                    if self.game_mode == "Game Mode":
+                        if detected_label in self.game_actions:
+                            action = self.game_actions[detected_label].get()
+                            self.execute_drone_action(action)
                     self.action_done_for_label = detected_label
 
             elif detection_mode == "Color Game Mode":
@@ -952,31 +1138,44 @@ class GUI:
                 kernel = np.ones((5, 5), np.uint8)
                 img_dil = cv2.dilate(img_canny, kernel, iterations=1)
 
-                self.object_center, self.w, self.h, self.detected_color = self.detect_objects_color_contour_dual_gamemode(
-                    mask_green, mask_orange, mask_blue, mask_purple, img_contour
-                    
-                )
+                object_center, w, h, detected_color = self.detect_objects_color_contour_dual_gamemode(
+                    mask_green, mask_orange, mask_blue, mask_purple, img_contour)
+                if detected_color is not None and detected_color != self.action_done_for_label:
+                    #Si hay un cambio de color quizas deberiamos de meter una espera de tiempo porque entre el cambio de color
+                    #el area se modifica y esto puede provar cambios de velocidad for_back drásticos
+                    if self.game_mode == "Color Game Mode":
+                        if detected_color in self.color_actions:
+                            action = self.color_actions[detected_color].get()
+                            self.execute_drone_action(action)
 
-                if self.detected_color is not None and self.detected_color != self.action_done_for_label:
-
-                    if self.detected_color in self.color_actions:
-                        action = self.color_actions[self.detected_color].get()
-                        self.execute_drone_action(action)
-
-                    self.action_done_for_label = self.detected_color
+                    self.action_done_for_label = detected_color
 
             else:
                 cv2.putText(img_contour, "No detection mode active", (10, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
 
-            self.latest_w = self.w
-            self.latest_h = self.h
+            self.latest_w = w
+            self.latest_h = h
 
-            self.img_highres = cv2.resize(my_frame, (640, 480))
-            self.gray_highres = cv2.cvtColor(self.img_highres, cv2.COLOR_BGR2GRAY)
+            img_highres = cv2.resize(my_frame, (640, 480))
+            gray_highres = cv2.cvtColor(img_highres, cv2.COLOR_BGR2GRAY)
+            mode = self.opt_dist_method.get()
+            camera_matrix = self.camera_matrix
+            dist_coeffs = self.dist_coeffs
 
-            if self.object_center and self.distance is not None:
-                cx, cy = self.object_center
+            if mode == "Distance by ratio" and object_center is not None:
+                distance = self.distance_by_ratio(img_display, object_center, w, h)
+            elif mode == "Distance by ArUco":
+                distance = self.distance_by_aruco(gray_highres, img_contour, camera_matrix, dist_coeffs)
+            elif mode == "Distance by pinhole":
+                distance = self.distance_by_pinhole(camera_matrix, w, h)
+            elif mode == "Manual distance":
+                distance = self.distance_by_hand(w, h)
+            else:
+                self.dist_label.config(text="No calibration available")
+
+            if object_center and distance is not None:
+                cx, cy = object_center
                 cv2.line(img_contour, (int(self.panel_width / 2), int(self.panel_height / 2)), (cx, cy), (0, 0, 255), 3)
                 desired_distance = float(self.entry_dist.get()) if self.entry_dist.get() else 110
 
@@ -986,18 +1185,18 @@ class GUI:
                 else:
                     error_y = cy - (self.panel_height / 2)
 
-                unsafe = self.check_distance_safety(cx, cy, self.w, self.h, self.distance)
+                unsafe = self.check_distance_safety(cx, cy, w, h, distance)
 
                 if unsafe:
                     error_z = 0
                 else:
-                    if self.opt_dist_method.get() == "Distance by ratio":
+                    if mode == "Distance by ratio":
                         e_max = (self.panel_width / 2 + self.panel_height / 2) / 2
-                        error_z = e_max / desired_distance * self.distance - e_max
-                    elif self.opt_dist_method.get() == "Manual distance":
-                        error_z = self.distance if self.distance else 0
+                        error_z = e_max / desired_distance * distance - e_max
+                    elif mode == "Manual distance":
+                        error_z = distance if distance else 0
                     else:
-                        error_z = self.distance - desired_distance
+                        error_z = distance - desired_distance
 
                 self.controller.integral_x += error_x
                 derivative_x = error_x - self.controller.prev_error_x
@@ -1072,7 +1271,7 @@ class GUI:
                 self.controller.yaw_velocity = 0
 
                 if self.opt_cam.get() == "Drone Camera" and detection_mode == "Color Contour":
-                    if self.detected_color == "green":
+                    if detected_color == "green":
                         self.Kp_x.set(0.36)
                         self.Ki_x.set(0.0003)
                         self.Kd_x.set(2.8)
@@ -1093,7 +1292,7 @@ class GUI:
                             speed_x = 0
                         self.controller.left_right_velocity = np.clip(speed_x, -self.max_velocity.get(), self.max_velocity.get())
                         self.controller.yaw_velocity = 0
-                    elif self.detected_color == "blue":
+                    elif detected_color == "blue":
                         self.Kp_x.set(0.42)
                         self.Ki_x.set(0.0005)
                         self.Kd_x.set(1.9)
@@ -1150,7 +1349,6 @@ class GUI:
                     self.controller.prev_error_y = 0
                     self.controller.prev_error_z = 0
                     #print("Estamos en modo simulacion")
-                
                 elif self.simulation_var.get() == "False" and self.block_PID == False:
 
                     if (time.time() - self.offset_timestamp) * 1000 > self.offset_duration_ms:
@@ -1213,16 +1411,14 @@ class GUI:
                 labels.imgtk = imgtk
                 labels.config(image=imgtk)
 
+
+
             now = time.time()
             dt = now - self.last_position_time
             self.last_position_time = now
             yaw_deg = self.update_yaw(self.controller.yaw_velocity,dt)
             self.tracker.update_with_velocities(self.controller.left_right_velocity,self.controller.for_back_velocity,yaw_deg,dt,plot=True)
 
-        else:
-
-            self.connected_label.config(text="Not Connected", fg="red")
-        
         self.root.after(30, self.update_frame)
 
 
