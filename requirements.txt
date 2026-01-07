@@ -12,3 +12,6 @@ mss
 paho-mqtt
 aiortc
 websockets
+folium
+selenium
+pywin32
