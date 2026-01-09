@@ -339,37 +339,6 @@ class HexsoonController:
                 with self.yolo_lock:
                     self.yolo_result = (None, [])
 
-    @staticmethod
-    def hsv_to_rgb_from_0_255(hsv_lower, hsv_upper):
-        h, s, v = hsv_upper
-        # Scale H from 0-179 to 0-360
-        H = h * 2
-        S = s / 255
-        V = v / 255
-
-        C = V * S
-        X = C * (1 - abs((H / 60) % 2 - 1))
-        m = V - C
-
-        if 0 <= H < 60:
-            r1, g1, b1 = C, X, 0
-        elif 60 <= H < 120:
-            r1, g1, b1 = X, C, 0
-        elif 120 <= H < 180:
-            r1, g1, b1 = 0, C, X
-        elif 180 <= H < 240:
-            r1, g1, b1 = 0, X, C
-        elif 240 <= H < 300:
-            r1, g1, b1 = X, 0, C
-        else:
-            r1, g1, b1 = C, 0, X
-
-        R = int((r1 + m) * 255)
-        G = int((g1 + m) * 255)
-        B = int((b1 + m) * 255)
-
-        return R, G, B
-
 
     def get_object_center(self, dil_frame: Optional[np.ndarray], img_contour: Optional[np.ndarray]) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
 
@@ -487,6 +456,7 @@ class HexsoonController:
             velocity_y = int(np.clip(velocity_y, -self.max_velocity, self.max_velocity))
 
             if self.view_mode == "Front View" and self.detection_mode == "Color Contour":
+                
                 if self.detected_color == "color1":
                     # Movimiento lateral
                     self.left_right = velocity_x
