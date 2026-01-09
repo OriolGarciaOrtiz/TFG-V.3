@@ -22,6 +22,7 @@ def main():
 
         def on_closing():
             hexsoon_gui.on_close()
+            thread_handler.stop()
             root.destroy()
 
         root.protocol("WM_DELETE_WINDOW", on_closing)

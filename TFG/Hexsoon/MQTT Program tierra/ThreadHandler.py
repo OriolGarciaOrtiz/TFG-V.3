@@ -20,8 +20,6 @@ class HandlerThreads:
         self.mqtt = MQTT(target_gui = self.target_gui)
         self.video = ServiceVideo(target_gui = self.target_gui)
 
-        print(Fore.GREEN + "Starting Threads")
-
 
     def handle_video_receiver_thread(self):
 
@@ -101,6 +99,8 @@ class HandlerThreads:
 
     def start(self):
 
+        print(Fore.GREEN + "Starting Threads")
+
         while self.target_gui.running: 
 
             self.handle_video_receiver_thread()
@@ -112,4 +112,14 @@ class HandlerThreads:
             self.handle_video_service_thread()
 
             time.sleep(1/self.target_gui.FPS)
+
+    
+    def stop(self):
+
+        self.receiver.running = False
+        self.mission_planner.running = False
+        self.mqtt.running = False
+        self.video.running = False
+
+        print(Fore.GREEN + "Stoping all Threads")
 
