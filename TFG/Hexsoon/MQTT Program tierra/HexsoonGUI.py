@@ -1,13 +1,10 @@
 from HexsoonClass import *
 import ctypes
-import cv2
 import numpy as np
 import tkinter as tk
 from tkinter import Label, messagebox
 from PIL import Image, ImageTk
 import threading
-import queue
-import time
 from colorama import init, Fore
 
 
@@ -25,12 +22,12 @@ class GUI:
 
         self.FPS: int = 45
 
-        self.video_queue: queue.Queue = queue.Queue(maxsize=2)
-
         self.user32 = ctypes.windll.user32
         self.PrintWindow = self.user32.PrintWindow
 
         self.running: bool = True
+
+        self.color_values: dict | None = None
 
         self.presets, self.color_menu = self.load_colors("colors.txt")
 
@@ -39,15 +36,6 @@ class GUI:
         self.setup_gui()
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
-
-        self.color_values: dict = {
-            "Color 1": {"preset": "Green", "h_min": 35, "h_max": 85, "s_min": 55, "s_max": 255, "v_min": 100, "v_max": 255},
-            "Color 2": {"preset": "Blue",  "h_min": 85, "h_max": 135, "s_min": 100, "s_max": 255, "v_min": 100, "v_max": 255},
-        }
-
-        self.thread_get_frame = threading.Thread(target=self.thread_get_frame_func, daemon=True)
-
-        self.thread_get_frame.start()
 
         self.update_frame()
 
@@ -110,6 +98,61 @@ class GUI:
                 presets[name] = values
                 names.append(name)
 
+        if len(presets) == 0:
+
+            self.color_values = {
+                "Color 1": {
+                    "preset": "Green",
+                    "h_min": 35, "h_max": 85,
+                    "s_min": 55, "s_max": 255,
+                    "v_min": 100, "v_max": 255
+                },
+                "Color 2": {
+                    "preset": "Blue",
+                    "h_min": 85, "h_max": 135,
+                    "s_min": 100, "s_max": 255,
+                    "v_min": 100, "v_max": 255
+                }
+            }
+
+        elif len(presets) == 1:
+
+            hmin, hmax, smin, smax, vmin, vmax = presets[names[0]]
+
+            self.color_values = {
+                "Color 1": {
+                    "preset": "Green",
+                    "h_min": 35, "h_max": 85,
+                    "s_min": 55, "s_max": 255,
+                    "v_min": 100, "v_max": 255
+                },
+                "Color 2": {
+                    "preset": names[0],
+                    "h_min": hmin, "h_max": hmax,
+                    "s_min": smin, "s_max": smax,
+                    "v_min": vmin, "v_max": vmax
+                }
+            }
+
+        else:
+            hmin1, hmax1, smin1, smax1, vmin1, vmax1 = presets[names[0]]
+            hmin2, hmax2, smin2, smax2, vmin2, vmax2 = presets[names[1]]
+
+            self.color_values = {
+                "Color 1": {
+                    "preset": names[0],
+                    "h_min": hmin1, "h_max": hmax1,
+                    "s_min": smin1, "s_max": smax1,
+                    "v_min": vmin1, "v_max": vmax1
+                },
+                "Color 2": {
+                    "preset": names[1],
+                    "h_min": hmin2, "h_max": hmax2,
+                    "s_min": smin2, "s_max": smax2,
+                    "v_min": vmin2, "v_max": vmax2
+                }
+            }
+
         return presets, names
 
     
@@ -156,7 +199,7 @@ class GUI:
         self.v_max.set(values["v_max"])
 
         # Restore preset dropdown
-        self.color_opt.set(values.get("preset", "Green"))
+        self.color_opt.set(values.get("preset", self.color_menu[0]))
 
 
     def create_color(self):
@@ -247,7 +290,7 @@ class GUI:
 
 
     def create_control_buttons(self):
-        self.color_opt = tk.StringVar(value="Green")
+        self.color_opt = tk.StringVar(value=self.color_menu[0])
         self.color_menu_widget = tk.OptionMenu(self.root, self.color_opt, *self.color_menu)
         self.color_menu_widget.grid(row=7, column=1, padx=10, pady=10)
 
@@ -531,28 +574,6 @@ class GUI:
         self.yaw_label.config(text=f"Yaw Velocity = {self.controller.yaw:.2f}")
 
 
-    def thread_get_frame_func(self):
-
-        while self.running:
-            try:
-                original_frame, detected_frame = None, None
-                if self.controller.is_connected:
-                    original_frame, detected_frame = self.controller.get_frame()
-
-                while not self.video_queue.empty():
-                    self.video_queue.get_nowait()
-
-                self.video_queue.put((original_frame, detected_frame))
-
-                time.sleep(1/self.FPS)
-
-            except queue.Full:
-                time.sleep(1/self.FPS)
-            except Exception as e:
-                print(Fore.RED + f"Frame thread error: {e}")
-                time.sleep(1/self.FPS)
-
-
     def update_frame(self):
 
         try:
@@ -584,5 +605,5 @@ class GUI:
 
     def on_close(self):
         self.running = False
-        self.root.after(100, self.root.destroy)
+        self.root.after(int(1/self.FPS), self.root.destroy)
 
