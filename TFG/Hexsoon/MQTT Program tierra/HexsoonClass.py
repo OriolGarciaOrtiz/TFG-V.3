@@ -8,87 +8,86 @@ import numpy as np
 from pymavlink import mavutil
 from dronLink.modules.dron_move import _prepare_command_mov
 from dronLink.modules.dron_RC_override import send_rc
-import base64
 from colorama import init, Fore
 import threading
 import queue
-import tkinter as tk
+from typing import Optional, Tuple
 
 
 class HexsoonController:
     def __init__(self):
-        self.is_connected = False
-        self.dron = Dron()
+        self.is_connected: bool = False
+        self.dron: Dron = Dron()
         self.cap = None
-        self.take_off_finalizado = False
+        self.take_off_finalizado: bool = False
 
         init(autoreset=True)
 
-        self.color_opt = "Green"
+        self.color_opt: str | None = None
 
-        self.detected_color = None
-        self.model = None
+        self.detected_color: str | None = None
+        self.model: YOLO | None = None
 
-        self.panel_width = 320
-        self.panel_height = 240
+        self.panel_width: int = 320
+        self.panel_height: int = 240
 
         self.colors: dict | None = None
 
-        self.zoom_factor = 1.5
+        self.zoom_factor: float = 1.5
 
-        self.t1 = 166
-        self.t2 = 171
+        self.t1: int = 166
+        self.t2: int = 171
 
-        self.detection_mode = "Color Contour"
+        self.detection_mode: str | None = None
 
-        self.Kp_x = 0
-        self.Ki_x = 0
-        self.Kd_x = 0
-        self.Kp_y = 0
-        self.Ki_y = 0
-        self.Kd_y = 0
+        self.Kp_x: float = 0
+        self.Ki_x: float = 0
+        self.Kd_x: float = 0
+        self.Kp_y: float = 0
+        self.Ki_y: float = 0
+        self.Kd_y: float = 0
 
-        self.PID_mode = "PID"
+        self.PID_mode: str | None = None
 
-        self.max_velocity = 50
+        self.max_velocity: int = 50
 
-        self.view_mode = "Front View"
+        self.view_mode: str | None = None
 
-        self.take_off_alt = 2
+        self.take_off_alt: int = 2
 
-        self.try_mode = "Practice"
+        self.try_mode: str | None = None
 
-        self.type_camera_option = "Default Cam"
+        self.type_camera_option: str | None = None
 
-        self.click_connect = False
-        self.click_disconnect = False
+        self.click_connect: bool = False
+        self.click_disconnect: bool = False
 
-        self.uncoded_original_frame = None
-        self.uncoded_detected_frame = None
+        self.uncoded_original_frame: np.ndarray | None = None
+        self.uncoded_detected_frame: np.ndarray | None = None
 
-        self.prev_error_x = 0
-        self.prev_error_y = 0
+        self.prev_error_x: float = 0
+        self.prev_error_y: float = 0
 
-        self.integral_x = 0
-        self.integral_y = 0
+        self.integral_x: float = 0
+        self.integral_y: float = 0
 
-        self.left_right = 0
-        self.for_back = 0
-        self.up_down = 0
-        self.yaw = 0
+        self.left_right: float = 0
+        self.for_back: float = 0
+        self.up_down: float = 0
+        self.yaw: float = 0
 
-        self.original_frame_RTC = None
-        self.detected_frame_RTC = None
+        self.original_frame_RTC: np.ndarray | None = None
+        self.detected_frame_RTC: np.ndarray | None = None
 
-        yamlname = 'calibration_data_px.yaml'
-        self.data = None
+        yamlname: str = 'calibration_data_px.yaml'
+        self.data: dict | None = None
         with open(yamlname) as f:
             self.data = yaml.safe_load(f)
 
-        self.yolo_queue = queue.Queue(maxsize=1)
-        self.yolo_result = (None, [])
-        self.yolo_lock = threading.Lock()
-        self.yolo_running = True
+        self.yolo_queue: queue = queue.Queue(maxsize=1)
+        self.yolo_result: tuple[tuple[int, int] | None, list] = (None, [])
+        self.yolo_lock: threading.Lock = threading.Lock()
+        self.yolo_running: bool = True
 
         self.yolo_thread = threading.Thread(
             target=self._yolo_worker_loop,
@@ -176,9 +175,12 @@ class HexsoonController:
     def set_velocity(self): #OJO, cambios
         if not self.take_off_finalizado:
             return
+        
         vehicle: mavutil.mavfile = getattr(self.dron, 'vehicle', None)
+
         if vehicle is None:
             return
+        
         if self.detection_mode == "Color Contour":
 
             if self.view_mode == "Front View":
@@ -219,15 +221,8 @@ class HexsoonController:
             msg = _prepare_command_mov(self.dron, 0, 0, 0, bodyRef=True)
             vehicle.mav.send(msg)
 
-    def base64_to_image(self, b64_string):
-        if b64_string is None:
-            return None
-        img_data = base64.b64decode(b64_string)
-        np_arr = np.frombuffer(img_data, np.uint8)
-        frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-        return frame
 
-    def zoom_frame(self, frame, zoom_factor=1.5):
+    def zoom_frame(self, frame: np.ndarray, zoom_factor: float=1.5) -> np.ndarray:
 
         if zoom_factor <= 1.0:
             return frame
@@ -253,7 +248,9 @@ class HexsoonController:
         )
 
         return zoomed
-    def cap_frame(self, mode: str):
+    
+
+    def cap_frame(self, mode: str) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
 
         # ------------------------- PC CAMERA MODE -------------------------
         if mode == "Default Cam":
@@ -352,11 +349,11 @@ class HexsoonController:
         v = int((hsv_lower[2] + hsv_upper[2]) / 2)
         
         hsv_pixel = np.uint8([[[h, s, v]]])
-        rgb_pixel = cv2.cvtColor(hsv_pixel, cv2.COLOR_HSV2BGR)  # OpenCV returns BGR
-        b, g, r = rgb_pixel[0, 0]  # unpack BGR
+        rgb_pixel = cv2.cvtColor(hsv_pixel, cv2.COLOR_HSV2BGR)
+        b, g, r = rgb_pixel[0, 0]
         return (r, g, b)
 
-    def get_object_center(self, dil_frame, img_contour): #OJO, cambios
+    def get_object_center(self, dil_frame: Optional[np.ndarray], img_contour: Optional[np.ndarray]) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
 
         if self.detection_mode == "Color Contour":
             contours, _ = cv2.findContours(
@@ -371,15 +368,14 @@ class HexsoonController:
                     x, y, w, h = cv2.boundingRect(c)
                     object_center = (x + w // 2, y + h // 2)
 
-                    # -------------------- Selección de color --------------------
                     if self.detected_color == "color1":
-                        rect_color = (0, 255, 0)  # Verde
-                        circle_color = (255, 0, 0)  # Azul
+                        rect_color = (0, 255, 0)
+                        circle_color = (255, 0, 0)
                     elif self.detected_color == "color2":
-                        rect_color = (0, 0, 255)  # Rojo
-                        circle_color = (0, 255, 255)  # Amarillo
+                        rect_color = (0, 0, 255)
+                        circle_color = (0, 255, 255)
                     else:
-                        rect_color = (255, 255, 255)  # Blanco por defecto
+                        rect_color = (255, 255, 255)
                         circle_color = (255, 255, 255)
 
                     # Dibujar rectángulo y círculo
@@ -438,7 +434,7 @@ class HexsoonController:
             )
             return None, img_contour
 
-    def get_velocities(self, oject_center):
+    def get_velocities(self, oject_center: Optional[tuple[int, int]]):
 
         if oject_center is not None:
 
@@ -511,8 +507,6 @@ class HexsoonController:
                 self.integral_y += error_y
                 self.set_velocity()
 
-
-
         else:
             self.left_right = 0
             self.for_back = 0
@@ -521,10 +515,10 @@ class HexsoonController:
             self.integral_y = 0
             self.set_velocity()
 
-    def get_detected_frame(self, frame):
+    def get_detected_frame(self, frame: Optional[np.ndarray]) -> tuple[Optional[np.ndarray], Optional[np.ndarray]]:
 
-        frame_display = cv2.resize(frame, (self.panel_width, self.panel_height))
-        frame_hsv = cv2.cvtColor(frame_display, cv2.COLOR_BGR2HSV)
+        frame_display: np.ndarray | None = cv2.resize(frame, (self.panel_width, self.panel_height))
+        frame_hsv: np.ndarray | None = cv2.cvtColor(frame_display, cv2.COLOR_BGR2HSV)
 
         c1, c2 = self.colors["primary"], self.colors["secondary"]
 
@@ -570,7 +564,7 @@ class HexsoonController:
         img_canny = cv2.Canny(img_grey, self.t1, self.t2)
         img_dilated = cv2.dilate(img_canny, kernel, iterations=1)
 
-        img_contour = frame_display.copy()
+        img_contour: np.ndarray | None = frame_display.copy()
 
         object_center, img_contour = self.get_object_center(img_dilated, img_contour)
 
@@ -581,7 +575,7 @@ class HexsoonController:
 
         return img_dilated, img_contour
 
-    def get_frame(self):
+    def get_frame(self) -> tuple[Optional[np.ndarray], Optional[np.ndarray]]:
 
         try:
 
@@ -609,6 +603,7 @@ class HexsoonController:
         # Por ello he hecho esta función que mantiene el headind fijo y bloquea el yaw en modo guided cambiando las opciones de modo 0 a modo 8
 
         vehicle: mavutil.mavfile = getattr(self.dron, "vehicle", None)
+        
         msg = mavutil.mavlink.MAVLink_param_set_message(
             vehicle.target_system,
             vehicle.target_component,
@@ -616,6 +611,7 @@ class HexsoonController:
             float(value),
             mavutil.mavlink.MAV_PARAM_TYPE_REAL32
         )
+
         vehicle.mav.send(msg)
 
     def stabilizeYaw(self):

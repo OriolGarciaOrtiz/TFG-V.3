@@ -13,7 +13,6 @@ class DroneVideoReceiver:
     """
     def __init__(self, target_gui: GUI):
         self.frame_count = 0
-        self.running = True
         self.start_time = None
         self.gui = target_gui
         self.connected = False
@@ -26,6 +25,8 @@ class DroneVideoReceiver:
         self.ip_adress = "ws://127.0.0.1:9999"             # En caso que se quieran hacer pruebas en local
         #self.ip_adress = "ws://192.168.1.102:9999"       # Para cuando se quieran hacer pruebas de vuelo
 
+        self.running: bool = False
+
     async def receive_frame(self, track, track_label):
         """
         Recibir frames de un track específico y actualizar la GUI.
@@ -35,7 +36,7 @@ class DroneVideoReceiver:
         self.start_time = asyncio.get_event_loop().time()
 
         try:
-            while self.connected:
+            while self.running:
 
                 frame = await track.recv()
 

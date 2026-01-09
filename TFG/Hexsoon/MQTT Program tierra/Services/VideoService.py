@@ -11,10 +11,12 @@ class ServiceVideo:
         
         self.target_gui = target_gui
 
+        self.running: bool = False
+
 
     def start(self):
 
-        while self.target_gui.running:
+        while self.running:
             
             try:
 

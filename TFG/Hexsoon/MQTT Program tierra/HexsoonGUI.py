@@ -14,33 +14,33 @@ from colorama import init, Fore
 class GUI:
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.is_connected = False
+        self.is_connected: bool = False
         self.original_frame, self.detected_frame, self.mission_frame = None, None, None
         self.controller = HexsoonController()
 
-        self.misson_panel_heigth = 400
-        self.misson_panel_width = int(self.misson_panel_heigth * 16 / 9)
+        self.misson_panel_heigth: int = 400
+        self.misson_panel_width: int = int(self.misson_panel_heigth * 16 / 9)
 
         init(autoreset=True)
 
-        self.FPS = 45
+        self.FPS: int = 45
 
-        self.video_queue = queue.Queue(maxsize=2)
+        self.video_queue: queue.Queue = queue.Queue(maxsize=2)
 
         self.user32 = ctypes.windll.user32
         self.PrintWindow = self.user32.PrintWindow
 
-        self.running = True
+        self.running: bool = True
 
         self.presets, self.color_menu = self.load_colors("colors.txt")
 
-        self.frames_to_show = None
+        self.frames_to_show: list[np.ndarray | None] | None = None
 
         self.setup_gui()
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
-        self.color_values = {
+        self.color_values: dict = {
             "Color 1": {"preset": "Green", "h_min": 35, "h_max": 85, "s_min": 55, "s_max": 255, "v_min": 100, "v_max": 255},
             "Color 2": {"preset": "Blue",  "h_min": 85, "h_max": 135, "s_min": 100, "s_max": 255, "v_min": 100, "v_max": 255},
         }
@@ -400,7 +400,7 @@ class GUI:
             Label(self.root, text=text, font=("Arial", 12)).grid(row=i + 1, column=0)
 
 
-    def create_zoom_slider(self): #OJO, nueva función para poder hacer zoom en tiempo real
+    def create_zoom_slider(self):
         Label(self.root, text="Panoramic Zoom", font=("Arial", 12)).grid(row=9, column=0, padx=10, pady=5)
 
         self.zoom_var = tk.DoubleVar(value=1.5)
@@ -498,7 +498,7 @@ class GUI:
         self.controller.zoom_factor = self.zoom_var.get()
 
 
-    def update_video_frames(self, frames):
+    def update_video_frames(self, frames: list[Optional[np.ndarray]]):
         """Update video frames in main thread (Tkinter safe)"""
         try:
             for lbl, frame in zip(self.video_labels, frames):

@@ -156,7 +156,7 @@ class Broker(Frame):
 
 
 
-class CircoImagenes:
+class   CircoImagenes:
 
     def Open(self, master):
 

@@ -23,7 +23,7 @@ class MissionPlanner:
         self.mission_panel_height = 400
         self.mission_panel_width = int(self.mission_panel_height * 16 / 9)
 
-        self.running = True
+        self.running: bool = False
 
         self.user32 = ctypes.windll.user32
         self.PrintWindow = self.user32.PrintWindow
@@ -153,6 +153,7 @@ class MissionPlanner:
 
     # Loop principal del hilo
     def _mission_loop(self):
+
         while self.running:
             frame = None
             try:
@@ -169,11 +170,3 @@ class MissionPlanner:
             # Guardar frame en target_gui (puede ser None)
             self.target_gui.mission_frame = frame
             threading.Event().wait(0.5)  # medio segundo entre capturas
-
-    # Detener hilo
-    def stop(self):
-        self.running = False
-        try:
-            self.driver.quit()
-        except:
-            pass

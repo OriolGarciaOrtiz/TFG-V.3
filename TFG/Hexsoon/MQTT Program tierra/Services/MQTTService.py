@@ -24,6 +24,8 @@ class MQTT:
         self.clock_start = time.monotonic()
         self.send_interval = 0.5
 
+        self.running: bool = False
+
 
     def on_message(self, client, userdata, msg):
         if self.target_gui.controller.type_camera_option == "Raspi Cam":
@@ -97,7 +99,8 @@ class MQTT:
                 pass
 
     def run_loop(self):
-        while True:
+
+        while self.running:
             if self.target_gui.type_camera_option.get() == "Raspi Cam":
                 self.send_data()
             time.sleep(0.5)
