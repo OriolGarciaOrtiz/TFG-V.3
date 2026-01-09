@@ -382,14 +382,20 @@ class GUI:
         for i, (var, text) in enumerate(sliders_config):
             def on_slide(v, var=var, text=text):
                 current_color = self.color_sel.get()
-                key_base = text.split()[0].lower()  # 'hue', 'sat', 'value'
+                if current_color not in self.color_values:
+                    self.color_values[current_color] = {}
+                key_base = text.split()[0].lower()
                 key_suffix = "_min" if "Min" in text else "_max"
-                key = key_base[0] + key_suffix  # e.g., 'h_min'
+                key = key_base[0] + key_suffix
                 self.color_values[current_color][key] = int(float(v))
+
+            val = 255
+            if i == 0 or i == 1:
+                val = 179
 
             slider = tk.Scale(
                 self.root,
-                from_=0, to=255,
+                from_=0, to=val,
                 orient="horizontal",
                 variable=var,
                 length=200,
@@ -473,15 +479,21 @@ class GUI:
         secondary = self.color_values.get("Color 2", {})
 
         self.controller.colors = {
-            "primary": (
+        "primary": {
+            "range": (
                 (primary.get("h_min", 0), primary.get("s_min", 0), primary.get("v_min", 0)),
                 (primary.get("h_max", 255), primary.get("s_max", 255), primary.get("v_max", 255))
             ),
-            "secondary": (
+            "name": primary.get("preset", "Unknown")
+        },
+        "secondary": {
+            "range": (
                 (secondary.get("h_min", 0), secondary.get("s_min", 0), secondary.get("v_min", 0)),
                 (secondary.get("h_max", 255), secondary.get("s_max", 255), secondary.get("v_max", 255))
-            )
+            ),
+            "name": secondary.get("preset", "Unknown")
         }
+}
         self.controller.detection_mode = self.detection_selection.get()
         self.controller.Kp_x = self.Kp_x.get()
         self.controller.Ki_x = self.Ki_x.get()

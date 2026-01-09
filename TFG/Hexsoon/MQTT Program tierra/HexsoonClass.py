@@ -339,19 +339,37 @@ class HexsoonController:
                 with self.yolo_lock:
                     self.yolo_result = (None, [])
 
-    def hsv_to_rgb(hsv_lower, hsv_upper):
-        """
-        Take an HSV range (lower or upper), returns an approximate RGB color.
-        Uses the middle value of the HSV range for conversion.
-        """
-        h = int((hsv_lower[0] + hsv_upper[0]) / 2)
-        s = int((hsv_lower[1] + hsv_upper[1]) / 2)
-        v = int((hsv_lower[2] + hsv_upper[2]) / 2)
-        
-        hsv_pixel = np.uint8([[[h, s, v]]])
-        rgb_pixel = cv2.cvtColor(hsv_pixel, cv2.COLOR_HSV2BGR)
-        b, g, r = rgb_pixel[0, 0]
-        return (r, g, b)
+    @staticmethod
+    def hsv_to_rgb_from_0_255(hsv_lower, hsv_upper):
+        h, s, v = hsv_upper
+        # Scale H from 0-179 to 0-360
+        H = h * 2
+        S = s / 255
+        V = v / 255
+
+        C = V * S
+        X = C * (1 - abs((H / 60) % 2 - 1))
+        m = V - C
+
+        if 0 <= H < 60:
+            r1, g1, b1 = C, X, 0
+        elif 60 <= H < 120:
+            r1, g1, b1 = X, C, 0
+        elif 120 <= H < 180:
+            r1, g1, b1 = 0, C, X
+        elif 180 <= H < 240:
+            r1, g1, b1 = 0, X, C
+        elif 240 <= H < 300:
+            r1, g1, b1 = X, 0, C
+        else:
+            r1, g1, b1 = C, 0, X
+
+        R = int((r1 + m) * 255)
+        G = int((g1 + m) * 255)
+        B = int((b1 + m) * 255)
+
+        return R, G, B
+
 
     def get_object_center(self, dil_frame: Optional[np.ndarray], img_contour: Optional[np.ndarray]) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
 
@@ -368,19 +386,9 @@ class HexsoonController:
                     x, y, w, h = cv2.boundingRect(c)
                     object_center = (x + w // 2, y + h // 2)
 
-                    if self.detected_color == "color1":
-                        rect_color = (0, 255, 0)
-                        circle_color = (255, 0, 0)
-                    elif self.detected_color == "color2":
-                        rect_color = (0, 0, 255)
-                        circle_color = (0, 255, 255)
-                    else:
-                        rect_color = (255, 255, 255)
-                        circle_color = (255, 255, 255)
-
                     # Dibujar rectángulo y círculo
-                    cv2.rectangle(img_contour, (x, y), (x + w, y + h), rect_color, 2)
-                    cv2.circle(img_contour, object_center, 5, circle_color, cv2.FILLED)
+                    cv2.rectangle(img_contour, (x, y), (x + w, y + h), (0, 0, 0), 2)
+                    cv2.circle(img_contour, object_center, 5, (0, 0, 0), cv2.FILLED)
 
                     return object_center, img_contour
 
@@ -520,7 +528,7 @@ class HexsoonController:
         frame_display: np.ndarray | None = cv2.resize(frame, (self.panel_width, self.panel_height))
         frame_hsv: np.ndarray | None = cv2.cvtColor(frame_display, cv2.COLOR_BGR2HSV)
 
-        c1, c2 = self.colors["primary"], self.colors["secondary"]
+        c1, c2 = self.colors["primary"]["range"], self.colors["secondary"]["range"]
 
         # -------- COLOR 1 --------
         lower1 = np.array(c1[0])
@@ -546,12 +554,16 @@ class HexsoonController:
         area1 = max_area(mask1)
         area2 = max_area(mask2)
 
+        name: str = "None"
+
         if area1 > 100 and area1 >= area2:
             mask = mask1
             self.detected_color = "color1"
+            name = self.colors["primary"]["name"]
         elif area2 > 100:
             mask = mask2
             self.detected_color = "color2"
+            name = self.colors["secondary"]["name"]
         else:
             mask = np.zeros_like(mask1)
             self.detected_color = None
@@ -569,7 +581,7 @@ class HexsoonController:
         object_center, img_contour = self.get_object_center(img_dilated, img_contour)
 
         # DEBUG VISUAL (opcional pero útil)
-        cv2.putText(img_contour,f"COLOR: {self.detected_color}",(10, 20),cv2.FONT_HERSHEY_SIMPLEX,0.6,(0, 255, 0) if self.detected_color == "color1" else (255, 0, 0),2,)
+        cv2.putText(img_contour,f"COLOR: {name}",(10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0) if self.detected_color == "color1" else (0, 0, 0), 2)
 
         self.get_velocities(object_center)
 
