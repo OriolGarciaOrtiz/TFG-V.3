@@ -100,14 +100,21 @@ class MessageHandler:
         self.waiting_threads = []
         # este es el thread en el que se leen y distribuyen los mensajes
         self.thread = threading.Thread(target=self._message_loop)
-        self.thread.daemon = True
+        self.thread.daemon = False
         self.thread.start()
 
     def _message_loop(self):
         while self.running:
             # espero un mensaje. Este es el único punto en el que espermos un mensaje
             #msg = self.vehicle.recv_match(blocking=True, timeout=3)
-            msg = self.vehicle.recv_match(blocking=True)
+            try:
+                # Recibir mensaje con timeout
+                msg = self.vehicle.recv_match(blocking=True, timeout=1)
+            except OSError as e:
+                # Socket cerrado, salir del hilo
+                break
+            except Exception as e:
+                break
 
             if msg:
                 msg_type = msg.get_type()

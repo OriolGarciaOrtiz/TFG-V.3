@@ -2,7 +2,7 @@ from HexsoonGUI import GUI as HexsoonGUI
 import tkinter as tk
 import threading
 from ThreadHandler import HandlerThreads
-
+import time
 
 def main():
     try:
@@ -21,8 +21,15 @@ def main():
         hexsoon_gui.update_frame()
 
         def on_closing():
-            hexsoon_gui.on_close()
+            root.after(0, cleanup_and_exit)
+            root.withdraw()
+
+
+        def cleanup_and_exit():
+
             thread_handler.stop()
+            hexsoon_gui.on_close()
+            hexsoon_gui.controller.disconnect_drone()
             root.destroy()
 
         root.protocol("WM_DELETE_WINDOW", on_closing)

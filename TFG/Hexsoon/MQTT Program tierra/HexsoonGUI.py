@@ -53,14 +53,12 @@ class GUI:
         self.create_zoom_slider()
 
 
-    def run_in_thread(self, target_func, status_msg="Executing..."):
+    def run_in_thread(self, target_func):
         """Helper to run actions in background threads"""
 
         def task():
             try:
-                print(Fore.BLUE + status_msg)
                 result = target_func()
-                print(Fore.GREEN + "Action complete")
                 return result
             except Exception as e:
                 print(Fore.RED + f"Error: {str(e)}")
@@ -207,16 +205,10 @@ class GUI:
         window.title("Create Color")
         window.resizable(False, False)
 
-        # -------------------------
-        # Color name
-        # -------------------------
         tk.Label(window, text="Color name:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
         name_entry = tk.Entry(window, width=22)
         name_entry.grid(row=0, column=1, padx=10, pady=5)
 
-        # -------------------------
-        # HSV variables
-        # -------------------------
         h_min = tk.IntVar(value=0)
         h_max = tk.IntVar(value=255)
         s_min = tk.IntVar(value=0)
@@ -310,22 +302,18 @@ class GUI:
         self.takeoff_height.insert(0, "2")
         self.takeoff_height.grid(column=2, row=1, padx=10, pady=10)
 
-        # Take off button - use controller.take_off_drone directly
         self.take_off_button = tk.Button(self.root, text="Arm and Take-off",
                                          command=lambda: self.run_in_thread(self.controller.take_off_drone))
         self.take_off_button.grid(column=3, row=1, padx=10, pady=10)
 
-        # Landing Button - use controller.land_drone directly
         self.landing_button = tk.Button(self.root, text="Landing",
                                         command=lambda: self.run_in_thread(self.controller.land_drone))
         self.landing_button.grid(column=2, row=2, padx=10, pady=10)
 
-        # Disconnect button - use controller.disconnect_drone directly
         self.disconnect_button = tk.Button(self.root, text="Disconnect",
                                            command=lambda: self.run_in_thread(self.controller.disconnect_drone))
         self.disconnect_button.grid(column=3, row=2, padx=10, pady=10)
 
-        # RTL button - use controller.Return_To_Launch_drone directly
         self.RTL_button = tk.Button(self.root, text="RTL",
                                     command=lambda: self.run_in_thread(self.controller.Return_To_Launch_drone))
         self.RTL_button.grid(column=4, row=2, padx=10, pady=10)
@@ -517,7 +505,7 @@ class GUI:
 
 
     def transfer_data(self):
-        """Transfer GUI settings to controller"""
+
         primary = self.color_values.get("Color 1", {})
         secondary = self.color_values.get("Color 2", {})
 
@@ -554,7 +542,7 @@ class GUI:
 
 
     def update_video_frames(self, frames: list[Optional[np.ndarray]]):
-        """Update video frames in main thread (Tkinter safe)"""
+
         try:
             for lbl, frame in zip(self.video_labels, frames):
                 if frame is not None:
@@ -566,7 +554,6 @@ class GUI:
 
 
     def update_velocity_labels(self):
-        """Update velocity labels in main thread"""
 
         self.lr_label.config(text=f"Left-Right Velocity = {self.controller.left_right:.2f}")
         self.fb_label.config(text=f"For-Back Velocity = {self.controller.for_back:.2f}")
@@ -575,6 +562,9 @@ class GUI:
 
 
     def update_frame(self):
+
+        if not self.running:
+            return
 
         try:
 
@@ -604,6 +594,11 @@ class GUI:
 
 
     def on_close(self):
-        self.running = False
-        self.root.after(int(1/self.FPS), self.root.destroy)
+
+        self.controller.yolo_running = False
+
+        if self.controller.is_connected:
+            self.controller.Return_To_Launch_drone()
+
+        self.is_connected = False
 

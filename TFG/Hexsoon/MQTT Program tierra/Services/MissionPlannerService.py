@@ -3,7 +3,7 @@ import win32ui
 import ctypes
 import numpy as np
 import cv2
-import threading
+from dronLink.Dron import Dron
 import time
 import folium
 import math
@@ -22,6 +22,8 @@ class MissionPlanner:
         self.target_gui = target_gui
         self.mission_panel_height = 400
         self.mission_panel_width = int(self.mission_panel_height * 16 / 9)
+
+        self.dron: Dron = self.target_gui.controller.dron
 
         self.running: bool = False
 
@@ -95,10 +97,10 @@ class MissionPlanner:
             return None
 
     # Generar mapa folium (modo Practice)
-    def generate_map_frame(self, dron):
+    def generate_map_frame(self):
         try:
-            lat, lon, yaw = dron.lat, dron.lon, dron.heading
-            alt = getattr(dron, "alt", 0)
+            lat, lon, yaw = self.dron.lat, self.dron.lon, self.dron.heading
+            alt = getattr(self.dron, "alt", 0)
 
             m = folium.Map(location=[lat, lon], zoom_start=18, tiles=None)
             folium.TileLayer(
@@ -151,22 +153,29 @@ class MissionPlanner:
             print(f"Error generate map: {e}")
             return None
 
-    # Loop principal del hilo
+
     def _mission_loop(self):
 
         while self.running:
+
             frame = None
+
             try:
+
                 mode = self.target_gui.test_selection.get()
+
                 if mode == "Simulation":
+
                     frame = self.capture_mission_planner()
+
                 elif mode == "Practice":
-                    dron = getattr(self.target_gui.controller,"dron",None)
-                    if dron and dron.lat is not None and dron.lon is not None:
-                        frame = self.generate_map_frame(dron)
+
+                    if self.dron and self.dron.lat is not None and self.dron.lon is not None:
+
+                        frame = self.generate_map_frame()
+
             except Exception as e:
                 print(f"Thread error: {e}")
 
-            # Guardar frame en target_gui (puede ser None)
             self.target_gui.mission_frame = frame
-            threading.Event().wait(0.5)  # medio segundo entre capturas
+            time.sleep(1/self.target_gui.FPS)

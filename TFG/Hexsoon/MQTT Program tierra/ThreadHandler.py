@@ -116,6 +116,8 @@ class HandlerThreads:
     
     def stop(self):
 
+        self.target_gui.running = False
+
         self.receiver.running = False
         self.mission_planner.running = False
         self.mqtt.running = False

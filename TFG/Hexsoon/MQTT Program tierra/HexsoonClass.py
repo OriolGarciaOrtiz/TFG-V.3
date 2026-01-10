@@ -121,25 +121,33 @@ class HexsoonController:
             
             self.dron.connect('tcp:127.0.0.1:5763', 115200)
 
+            print(Fore.GREEN + "Drone connected...")
+
         elif self.try_mode == "Practice":
 
             self.dron.connect('COM4', 57600)
+
+            print(Fore.GREEN + "Drone connected...")
 
         else:
             raise ValueError(Fore.RED + "Unknown connection mode selected")
 
         self.is_connected = True
 
+
     def disconnect_drone(self):
 
         if self.is_connected:
             self.click_disconnect = True
-            self.is_connected = False
             self.dron.disconnect()
 
+            print(Fore.GREEN + "Drone disconnected...")
+
+
     def take_off_drone(self):
+        
         if not self.is_connected:
-            print("No está conectado")
+            
             return
 
         print(Fore.GREEN + "Taking off...")
@@ -150,26 +158,31 @@ class HexsoonController:
         self.dron.takeOff(self.take_off_alt)
 
         time.sleep(10)
-        print("Takeoff completado")
+        print(Fore.GREEN + "Takeoff complete")
 
         self.take_off_finalizado = True
         self.stabilizeYaw()
+
 
     def land_drone(self):
 
         if self.is_connected:
             self.dron.Land()
 
+
     def Return_To_Launch_drone(self):
 
         if self.is_connected:
+
+            print(Fore.GREEN + "Returning to Launch...")
+
             self.dron.RTL()
+        
 
     def arm_drone(self):
 
         if self.is_connected:
             self.dron.arm()
-
 
 
     def set_velocity(self): #OJO, cambios
@@ -492,6 +505,7 @@ class HexsoonController:
             self.integral_x = 0
             self.integral_y = 0
             self.set_velocity()
+
 
     def get_detected_frame(self, frame: Optional[np.ndarray]) -> tuple[Optional[np.ndarray], Optional[np.ndarray]]:
 
