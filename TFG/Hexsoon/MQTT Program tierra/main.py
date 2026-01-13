@@ -2,7 +2,6 @@ from HexsoonGUI import GUI as HexsoonGUI
 import tkinter as tk
 import threading
 from ThreadHandler import HandlerThreads
-import time
 
 def main():
     try:

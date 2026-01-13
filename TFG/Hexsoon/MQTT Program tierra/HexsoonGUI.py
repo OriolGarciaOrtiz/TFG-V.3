@@ -2,10 +2,12 @@ from HexsoonClass import *
 import ctypes
 import numpy as np
 import tkinter as tk
-from tkinter import Label, messagebox
+from tkinter import Label
 from PIL import Image, ImageTk
 import threading
 from colorama import init, Fore
+from CreateNewColor import CreateColor
+from typing import Optional
 
 
 class GUI:
@@ -201,74 +203,22 @@ class GUI:
 
 
     def create_color(self):
-        window = tk.Toplevel(self.root)
-        window.title("Create Color")
-        window.resizable(False, False)
-
-        tk.Label(window, text="Color name:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
-        name_entry = tk.Entry(window, width=22)
-        name_entry.grid(row=0, column=1, padx=10, pady=5)
-
-        h_min = tk.IntVar(value=0)
-        h_max = tk.IntVar(value=255)
-        s_min = tk.IntVar(value=0)
-        s_max = tk.IntVar(value=255)
-        v_min = tk.IntVar(value=0)
-        v_max = tk.IntVar(value=255)
-
-        sliders = [
-            (h_min, "Hue Min:", 0, 179),
-            (h_max, "Hue Max:", 0, 179),
-            (s_min, "Sat Min:", 0, 255),
-            (s_max, "Sat Max:", 0, 255),
-            (v_min, "Value Min:", 0, 255),
-            (v_max, "Value Max:", 0, 255),
-        ]
-
-        for i, (var, text, frm, to) in enumerate(sliders, start=1):
-            tk.Label(window, text=text).grid(row=i, column=0, padx=10, pady=4, sticky="w")
-            tk.Scale(
-                window,
-                from_=frm,
-                to=to,
-                orient="horizontal",
-                variable=var,
-                length=220
-            ).grid(row=i, column=1, padx=10)
-
-        def create():
-            name = name_entry.get().strip()
-            if not name:
-                messagebox.showwarning("Missing name", "Please enter a color name.")
-                return
-
-            if name in self.presets:
-                messagebox.showwarning("Duplicate", "Color already exists.")
-                return
-
-            values = (
-                h_min.get(), h_max.get(),
-                s_min.get(), s_max.get(),
-                v_min.get(), v_max.get(),
-            )
-
-            # Append to file
-            with open("colors.txt", "a", encoding="utf-8") as f:
-                f.write(f"\n'{name}' " + " ".join(map(str, values)))
-
-            self.presets, self.color_menu = self.load_colors("colors.txt")
-
-            self.root.after(0, self.refresh_color_menu)
-
-            window.destroy()
-
-        tk.Button(window, text="Create", command=create).grid(
-            row=len(sliders) + 1,
-            column=0,
-            columnspan=2,
-            pady=12
+        dialog = CreateColor(
+            root=self.root,
+            presets=self.presets,
+            hexsoon=self.controller,
+            cam_opt=self.type_camera_option.get(),
+            zoom=float(self.zoom_var.get())
         )
 
+        dialog.create_color()
+
+        self.root.wait_window(dialog.window)
+
+        self.presets, self.color_menu = self.load_colors("colors.txt")
+        self.refresh_color_menu()
+
+        
 
     def refresh_color_menu(self):
         menu = self.color_menu_widget["menu"]
@@ -411,14 +361,19 @@ class GUI:
         ]
 
         for i, (var, text) in enumerate(sliders_config):
-            def on_slide(v, var=var, text=text):
+            KEY_MAP = {
+                "Hue Min:": "h_min",
+                "Hue Max:": "h_max",
+                "Sat Min:": "s_min",
+                "Sat Max:": "s_max",
+                "Value Min:": "v_min",
+                "Value Max:": "v_max",
+            }
+
+            def on_slide(v, text=text):
                 current_color = self.color_sel.get()
-                if current_color not in self.color_values:
-                    self.color_values[current_color] = {}
-                key_base = text.split()[0].lower()
-                key_suffix = "_min" if "Min" in text else "_max"
-                key = key_base[0] + key_suffix
-                self.color_values[current_color][key] = int(float(v))
+                self.color_values.setdefault(current_color, {})
+                self.color_values[current_color][KEY_MAP[text]] = int(float(v))
 
             val = 255
             if i == 0 or i == 1:

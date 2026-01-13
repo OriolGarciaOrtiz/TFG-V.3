@@ -276,7 +276,7 @@ class HexsoonController:
                 if not ret:
                     return None, None
 
-                return self.get_detected_frame(frame)  # No detected frame for webcam
+                return self.get_detected_frame(frame)
 
             except:
                 return None, None
