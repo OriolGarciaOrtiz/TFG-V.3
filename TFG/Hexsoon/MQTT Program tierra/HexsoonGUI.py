@@ -406,23 +406,22 @@ class GUI:
 
 
     def create_velocity_display(self):
-        label_width = 28
         
         self.lr_label = Label(self.root, text="Left-Right Velocity:", 
-                            font=("Arial", 14), padx=30)
-        self.lr_label.grid(column=2, row=3)
+                            font=("Arial", 14))
+        self.lr_label.grid(column=2, row=3, padx=(20, 0))
         
         self.fb_label = Label(self.root, text="For-Back Velocity:", 
-                            font=("Arial", 14), padx=30)
-        self.fb_label.grid(column=2, row=4)
+                            font=("Arial", 14))
+        self.fb_label.grid(column=2, row=4, padx=(20, 0))
         
         self.ud_label = Label(self.root, text="Up-Down Velocity:", 
-                            font=("Arial", 14), padx=30)
-        self.ud_label.grid(column=2, row=5)
+                            font=("Arial", 14))
+        self.ud_label.grid(column=2, row=5, padx=(20, 0))
         
         self.yaw_label = Label(self.root, text="Yaw Velocity:", 
-                            font=("Arial", 14), padx=30)
-        self.yaw_label.grid(column=2, row=6)
+                            font=("Arial", 14))
+        self.yaw_label.grid(column=2, row=6, padx=(20, 0))
 
 
         self.lr_value = Label(self.root, text=" 000.00", 
