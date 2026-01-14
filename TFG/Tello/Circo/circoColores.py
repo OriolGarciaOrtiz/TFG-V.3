@@ -14,6 +14,8 @@ from ColorDetector import ColorDetector
 from Calibrador import Calibrador
 from ColorPlan import ColorPlan
 
+from TFG_Joel_Oriol.main import main_code
+
 class Scene:
     def Open(self, master, callback):
         self.callback = callback
@@ -96,13 +98,8 @@ class CircoColores:
         matchBallWindow.mainloop()
 
     def empezarFollowCar(self):
-        followCarWindow = Toplevel(self.circusWindow)
-        followCarWindow.title("Follow car")
-        followCarWindow.geometry("450x650")
-        followCar = FollowCar()
-        frame = followCar.buildFrame(followCarWindow, self.drone, self.colorDetector, 'down')
-        frame.pack()
-        followCarWindow.mainloop()
+
+        main_code("Neural Network", self.circusWindow)
 
     def empezarColorPlan (self):
         colorPlanWindow = Toplevel(self.circusWindow)
@@ -123,13 +120,8 @@ class CircoColores:
         pass
 
     def empezarFollowColor (self):
-        followColorWindow = Toplevel(self.circusWindow)
-        followColorWindow.title("Follow color")
-        followColorWindow.geometry("800x650")
-        followColor = FollowColor()
-        frame = followColor.buildFrame(followColorWindow, self.drone, self.colorDetector, 'front')
-        frame.pack()
-        followColorWindow.mainloop()
+        main_code("Color Contour", self.circusWindow)
+    
     def bye(self):
         bye = Toplevel(self.circusWindow)
         bye.geometry("770x525")
