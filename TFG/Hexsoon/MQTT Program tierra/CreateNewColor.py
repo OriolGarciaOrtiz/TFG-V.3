@@ -157,9 +157,6 @@ class CreateColor:
 
                 roi = frame[y1:y2, x1:x2]
 
-                # Draw center dot
-                cv2.circle(frame, (cx, cy), 4, (255, 0, 0), -1)
-
                 # Convert ROI to HSV (BGR → HSV)
                 hsv_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
 
@@ -171,10 +168,12 @@ class CreateColor:
                 sat_label.config(text=f"Saturation: {self.mean_s}")
                 val_label.config(text=f"Value: {self.mean_v}")
 
-
                 # Convert BGR to RGB if needed
                 if frame.shape[-1] == 3:
                     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+                # Draw center dot
+                cv2.circle(frame, (cx, cy), 4, (255, 0, 0), -1)
 
                 image = Image.fromarray(frame)
                 image = image.resize((640, 360))
