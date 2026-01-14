@@ -78,9 +78,6 @@ class GUI:
                                         command=lambda: self.run_in_thread(self.controller.connect_drone))
         self.connect_button.grid(row=0, column=1, padx=10, pady=10)
 
-        self.battery_label = Label(self.root, text="Battery: -", font=("Arial", 14))
-        self.battery_label.grid(row=0, column=2, padx=10, pady=10)
-
 
     def load_colors(self, path: str):
         presets = {}
@@ -248,13 +245,15 @@ class GUI:
         self.color_opt.trace_add("write", self.apply_color_preset)
         self.color_sel.trace_add("write", self.switch_color)
 
+        tk.Label(self.root, text="Take-off alt:", font=("Arial", 14)).grid(column=2, row=0)
+
         self.takeoff_height = tk.Entry(self.root, width=10)
         self.takeoff_height.insert(0, "2")
-        self.takeoff_height.grid(column=2, row=1, padx=10, pady=10)
+        self.takeoff_height.grid(column=3, row=0, padx=10, pady=10)
 
         self.take_off_button = tk.Button(self.root, text="Arm and Take-off",
                                          command=lambda: self.run_in_thread(self.controller.take_off_drone))
-        self.take_off_button.grid(column=3, row=1, padx=10, pady=10)
+        self.take_off_button.grid(column=2, row=1, padx=10, pady=10)
 
         self.landing_button = tk.Button(self.root, text="Landing",
                                         command=lambda: self.run_in_thread(self.controller.land_drone))
@@ -266,7 +265,7 @@ class GUI:
 
         self.RTL_button = tk.Button(self.root, text="RTL",
                                     command=lambda: self.run_in_thread(self.controller.Return_To_Launch_drone))
-        self.RTL_button.grid(column=4, row=2, padx=10, pady=10)
+        self.RTL_button.grid(column=3, row=1, padx=10, pady=10)
         
         self.load_model_button = tk.Button(self.root, text="Load Yolo model", 
                                         command=lambda: self.run_in_thread(self.controller.load_model))
@@ -274,19 +273,16 @@ class GUI:
 
 
     def create_mode_selectors(self):
-        self.test_selection = tk.StringVar(value="Simulation")
-        test_menu = tk.OptionMenu(self.root, self.test_selection, "Simulation", "Practice")
-        test_menu.grid(row=0, column=3, padx=10, pady=10)
 
         tk.Label(self.root, text="Detection Mode:", font=("Arial", 14)).grid(row=0, column=4, padx=(20, 5), pady=10)
         self.detection_selection = tk.StringVar(value="Color Contour")
         detection_menu = tk.OptionMenu(self.root, self.detection_selection, "Color Contour", "Neural Network")
         detection_menu.grid(row=0, column=5, padx=10, pady=10)
 
-        Label(self.root, text="Controller used =", font=("Arial", 14)).grid(row=0, column=6, padx=10, pady=10)
-        self.controller_selection = tk.StringVar(value="PID")
-        controller_menu = tk.OptionMenu(self.root, self.controller_selection, "P", "I", "D", "PD", "PI", "PID", "None")
-        controller_menu.grid(row=0, column=7, padx=10, pady=10)
+        Label(self.root, text="Test mode =", font=("Arial", 14)).grid(row=0, column=6, padx=10, pady=10)
+        self.test_selection = tk.StringVar(value="Simulation")
+        test_menu = tk.OptionMenu(self.root, self.test_selection, "Simulation", "Practice")
+        test_menu.grid(row=0, column=7, padx=10, pady=10)
 
         Label(self.root, text="Mode used =", font=("Arial", 14)).grid(row=1, column=4, padx=10, pady=10)
         self.view_selection = tk.StringVar(value="Bottom View")
@@ -312,15 +308,15 @@ class GUI:
         self.create_pid_slider_set("X", 150)
         self.create_pid_slider_set("Y", 250)
 
-        Label(self.root, text="Max velocity:", font=("Arial", 12)).grid(row=7, column=3)
+        Label(self.root, text="Max velocity:", font=("Arial", 12)).grid(row=7, column=2)
         self.max_velocity = tk.DoubleVar(value=100)
         velocity_slider = tk.Scale(self.root, from_=0, to=100, resolution=1,
                                    orient="horizontal", variable=self.max_velocity,
                                    length=200)
-        velocity_slider.grid(row=8, column=3)
+        velocity_slider.grid(row=7, column=3)
 
 
-    def create_pid_slider_set(self, axis, y_pos):
+    def create_pid_slider_set(self, axis: str, y_pos: int):
         kp_label = tk.Label(self.root, text=f"Kp-{axis} (Proportional)")
         kp_label.place(x=800, y=y_pos)
 
@@ -393,7 +389,7 @@ class GUI:
 
 
     def create_zoom_slider(self):
-        Label(self.root, text="Panoramic Zoom", font=("Arial", 12)).grid(row=9, column=0, padx=10, pady=5)
+        Label(self.root, text="Panoramic Zoom", font=("Arial", 12)).grid(row=8, column=2, padx=10, pady=5)
 
         self.zoom_var = tk.DoubleVar(value=1.5)
 
@@ -406,27 +402,44 @@ class GUI:
             variable=self.zoom_var,
             length=200
         )
-        zoom_slider.grid(row=9, column=1, padx=10, pady=5)
+        zoom_slider.grid(row=8, column=3, padx=10, pady=5)
 
 
     def create_velocity_display(self):
         label_width = 28
         
-        self.lr_label = Label(self.root, text="Left-Right Velocity = 0.00", 
-                            font=("Arial", 14), width=label_width, anchor="w")
-        self.lr_label.grid(column=3, row=3, sticky="w")
+        self.lr_label = Label(self.root, text="Left-Right Velocity:", 
+                            font=("Arial", 14), padx=30)
+        self.lr_label.grid(column=2, row=3)
         
-        self.fb_label = Label(self.root, text="For-Back Velocity = 0.00", 
-                            font=("Arial", 14), width=label_width, anchor="w")
-        self.fb_label.grid(column=3, row=4, sticky="w")
+        self.fb_label = Label(self.root, text="For-Back Velocity:", 
+                            font=("Arial", 14), padx=30)
+        self.fb_label.grid(column=2, row=4)
         
-        self.ud_label = Label(self.root, text="Up-Down Velocity = 0.00", 
-                            font=("Arial", 14), width=label_width, anchor="w")
-        self.ud_label.grid(column=3, row=5, sticky="w")
+        self.ud_label = Label(self.root, text="Up-Down Velocity:", 
+                            font=("Arial", 14), padx=30)
+        self.ud_label.grid(column=2, row=5)
         
-        self.yaw_label = Label(self.root, text="Yaw Velocity = 0.00", 
-                            font=("Arial", 14), width=label_width, anchor="w")
-        self.yaw_label.grid(column=3, row=6, sticky="w")
+        self.yaw_label = Label(self.root, text="Yaw Velocity:", 
+                            font=("Arial", 14), padx=30)
+        self.yaw_label.grid(column=2, row=6)
+
+
+        self.lr_value = Label(self.root, text=" 000.00", 
+                            font=("Arial", 12))
+        self.lr_value.grid(column=3, row=3)
+        
+        self.fb_value = Label(self.root, text="000.00", 
+                            font=("Arial", 12))
+        self.fb_value.grid(column=3, row=4)
+        
+        self.ud_value = Label(self.root, text="000.00", 
+                            font=("Arial", 12))
+        self.ud_value.grid(column=3, row=5)
+        
+        self.yaw_value = Label(self.root, text="000.00", 
+                            font=("Arial", 12))
+        self.yaw_value.grid(column=3, row=6)
 
 
     def create_video_panels(self):
@@ -461,8 +474,8 @@ class GUI:
 
     def transfer_data(self):
 
-        primary = self.color_values.get("Color 1", {})
-        secondary = self.color_values.get("Color 2", {})
+        primary: dict = self.color_values.get("Color 1", {})
+        secondary: dict = self.color_values.get("Color 2", {})
 
         self.controller.colors = {
         "primary": {
@@ -487,7 +500,6 @@ class GUI:
         self.controller.Kp_y = self.Kp_y.get()
         self.controller.Ki_y = self.Ki_y.get()
         self.controller.Kd_y = self.Kd_y.get()
-        self.controller.PID_mode = self.controller_selection.get()
         self.controller.max_velocity = self.max_velocity.get()
         self.controller.view_mode = self.view_selection.get()
         self.controller.take_off_alt = float(self.takeoff_height.get())
@@ -510,10 +522,10 @@ class GUI:
 
     def update_velocity_labels(self):
 
-        self.lr_label.config(text=f"Left-Right Velocity = {self.controller.left_right:.2f}")
-        self.fb_label.config(text=f"For-Back Velocity = {self.controller.for_back:.2f}")
-        self.ud_label.config(text=f"Up-Down Velocity = {self.controller.up_down:.2f}")
-        self.yaw_label.config(text=f"Yaw Velocity = {self.controller.yaw:.2f}")
+        self.lr_value.config(text=f"{self.controller.left_right:.2f}")
+        self.fb_value.config(text=f"{self.controller.for_back:.2f}")
+        self.ud_value.config(text=f"{self.controller.up_down:.2f}")
+        self.yaw_value.config(text=f"{self.controller.yaw:.2f}")
 
 
     def update_frame(self):

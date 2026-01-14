@@ -47,8 +47,6 @@ class HexsoonController:
         self.Ki_y: float = 0
         self.Kd_y: float = 0
 
-        self.PID_mode: str | None = None
-
         self.max_velocity: int = 50
 
         self.view_mode: str | None = None
@@ -208,7 +206,7 @@ class HexsoonController:
 
                 elif self.detected_color == "color2":
 
-                    yaw_input = self.yaw / 100.0  # Valores entre -1 y 1 porque velocityx solo puede ir entre -100 a 100
+                    yaw_input = self.yaw / 300.0  # Valores entre -1 y 1 porque velocityx solo puede ir entre -100 a 100
                     yaw_pwm = 1500 + int(
                         yaw_input * 150)  # Para que la velocidad no sea super alta le ponemos un límite de +-150 porque si queremos usar los mismos Kp,Ki,Kd que los de left right el yaw se mueve demasiado según las pruebas que he hecho en simulación
                     yaw_pwm = max(1100, min(1900,
@@ -288,7 +286,7 @@ class HexsoonController:
 
             return self.original_frame_RTC, self.detected_frame_RTC
 
-        # ------------------------- PC CAMERA MODE -------------------------
+        # ------------------------- Panoramic CAMERA MODE -------------------------
         elif mode == "Panoramic Cam":
 
             try:
@@ -437,33 +435,8 @@ class HexsoonController:
             self.prev_error_x = error_x
             self.prev_error_y = error_y
 
-            if self.PID_mode == "P":
-                velocity_x = self.Kp_x * error_x
-                velocity_y = self.Kp_y * error_y
-
-            elif self.PID_mode == "I":
-                velocity_x = self.Ki_x * self.integral_x
-                velocity_y = self.Ki_y * self.integral_y
-
-            elif self.PID_mode == "D":
-                velocity_x = self.Kd_x * derivative_x
-                velocity_y = self.Kd_y * derivative_y
-
-            elif self.PID_mode == "PI":
-                velocity_x = (self.Kp_x * error_x) + (self.Ki_x * self.integral_x)
-                velocity_y = (self.Kp_y * error_y) + (self.Ki_y * self.integral_y)
-
-            elif self.PID_mode == "PD":
-                velocity_x = (self.Kp_x * error_x) + (self.Kd_x * derivative_x)
-                velocity_y = (self.Kp_y * error_y) + (self.Kd_y * derivative_y)
-
-            elif self.PID_mode == "PID":
-                velocity_x = (self.Kp_x * error_x) + (self.Ki_x * self.integral_x) + (self.Kd_x * derivative_x)
-                velocity_y = (self.Kp_y * error_y) + (self.Ki_y * self.integral_y) + (self.Kd_y * derivative_y)
-
-            else:
-                velocity_x = 0
-                velocity_y = 0
+            velocity_x = (self.Kp_x * error_x) + (self.Ki_x * self.integral_x) + (self.Kd_x * derivative_x)
+            velocity_y = (self.Kp_y * error_y) + (self.Ki_y * self.integral_y) + (self.Kd_y * derivative_y)
 
             velocity_x = int(np.clip(velocity_x, -self.max_velocity, self.max_velocity))
             velocity_y = int(np.clip(velocity_y, -self.max_velocity, self.max_velocity))
@@ -471,12 +444,10 @@ class HexsoonController:
             if self.view_mode == "Front View" and self.detection_mode == "Color Contour":
                 
                 if self.detected_color == "color1":
-                    # Movimiento lateral
                     self.left_right = velocity_x
                     self.yaw = 0
 
                 elif self.detected_color == "color2":
-                    # Giro en yaw
                     self.left_right = 0
                     self.yaw = velocity_x
 
