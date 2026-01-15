@@ -4,6 +4,7 @@ from Services.WebRTCService import DroneVideoReceiver
 from Services.MissionPlannerService import MissionPlanner
 from Services.MQTTService import MQTT
 from Services.VideoService import ServiceVideo
+from Services.YoloService import ServiceYolo
 from colorama import init, Fore
 import time
 
@@ -19,6 +20,7 @@ class HandlerThreads:
         self.mission_planner = MissionPlanner(target_gui = self.target_gui)
         self.mqtt = MQTT(target_gui = self.target_gui)
         self.video = ServiceVideo(target_gui = self.target_gui)
+        self.yolo = ServiceYolo(target_gui = self.target_gui)
 
 
     def handle_video_receiver_thread(self):
@@ -97,6 +99,24 @@ class HandlerThreads:
             print(Fore.GREEN + "Stoping Video Service Thread")
 
 
+    def handle_yolo_service(self):
+
+        if not self.yolo.running and self.target_gui.controller.detection_mode == "Neural Network":
+
+            self.yolo.running = True
+
+            threading.Thread(target=self.yolo.start, daemon=True).start()
+
+            print(Fore.GREEN + "Starting Yolo Service Thread")
+
+
+        if self.yolo.running and self.target_gui.controller.detection_mode != "Neural Network":
+
+            self.yolo.running = False
+
+            print(Fore.GREEN + "Stoping Yolo Service Thread")
+
+
     def start(self):
 
         print(Fore.GREEN + "Starting Threads")
@@ -110,6 +130,8 @@ class HandlerThreads:
             self.handle_mqtt_thread()
 
             self.handle_video_service_thread()
+
+            self.handle_yolo_service()
 
             time.sleep(1/self.target_gui.FPS)
 

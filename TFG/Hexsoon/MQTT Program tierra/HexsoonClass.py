@@ -82,16 +82,8 @@ class HexsoonController:
         with open(yamlname) as f:
             self.data = yaml.safe_load(f)
 
-        self.yolo_queue: queue = queue.Queue(maxsize=1)
         self.yolo_result: tuple[tuple[int, int] | None, list] = (None, [])
-        self.yolo_lock: threading.Lock = threading.Lock()
-        self.yolo_running: bool = True
 
-        self.yolo_thread = threading.Thread(
-            target=self._yolo_worker_loop,
-            daemon=True
-        )
-        self.yolo_thread.start()
 
     def load_model(self):
 
@@ -183,7 +175,7 @@ class HexsoonController:
             self.dron.arm()
 
 
-    def set_velocity(self): #OJO, cambios
+    def set_velocity(self):
         if not self.take_off_finalizado:
             return
         
@@ -317,41 +309,8 @@ class HexsoonController:
         # ------------------------- UNKNOWN MODE -------------------------
         return None, None
 
-    def _yolo_worker_loop(self):
-        while self.yolo_running:
-            frame = self.yolo_queue.get()
-            try:
-                results = self.model.predict(frame, conf=0.3, verbose=False)
 
-                object_center = None
-                boxes_info = []
-                max_area = 0
-
-                for r in results:
-                    for box in r.boxes:
-                        x1, y1, x2, y2 = map(int, box.xyxy[0])
-                        w, h = x2 - x1, y2 - y1
-                        area = w * h
-                        conf = float(box.conf[0])
-                        cls = int(box.cls[0])
-                        label = self.model.names[cls]
-
-                        boxes_info.append((x1, y1, x2, y2, label, conf))
-
-                        if area > max_area:
-                            max_area = area
-                            object_center = (x1 + w // 2, y1 + h // 2)
-
-                with self.yolo_lock:
-                    self.yolo_result = (object_center, boxes_info)
-
-            except Exception as e:
-                print(Fore.RED + f"YOLO worker error: {e}")
-                with self.yolo_lock:
-                    self.yolo_result = (None, [])
-
-
-    def get_object_center(self, dil_frame: Optional[np.ndarray], img_contour: Optional[np.ndarray]) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+    def get_object_center(self, dil_frame: Optional[np.ndarray], original_frame: Optional[np.ndarray]) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
 
         if self.detection_mode == "Color Contour":
             contours, _ = cv2.findContours(
@@ -366,36 +325,25 @@ class HexsoonController:
                     x, y, w, h = cv2.boundingRect(c)
                     object_center = (x + w // 2, y + h // 2)
 
-                    # Dibujar rectángulo y círculo
-                    cv2.rectangle(img_contour, (x, y), (x + w, y + h), (0, 0, 0), 2)
-                    cv2.circle(img_contour, object_center, 5, (0, 0, 0), cv2.FILLED)
+                    cv2.rectangle(original_frame, (x, y), (x + w, y + h), (0, 0, 0), 2)
+                    cv2.circle(original_frame, object_center, 5, (0, 0, 0), cv2.FILLED)
 
-                    return object_center, img_contour
+                    return object_center, original_frame
 
-            return None, img_contour
+            return None, original_frame
 
         # -------------------- NEURAL NETWORK MODE --------------------
         elif self.detection_mode == "Neural Network" and self.model is not None:
 
-            # Intentar mandar frame al worker (NO BLOQUEANTE)
-            try:
-                self.yolo_queue.put_nowait(img_contour.copy())
-            except Exception:
-                # YOLO sigue ocupado → seguimos usando el último resultado
-                pass
+            object_center, boxes_info = self.yolo_result
 
-            # Recuperar último resultado procesado
-            with self.yolo_lock:
-                object_center, boxes_info = self.yolo_result
-
-            # Dibujar detecciones (si existen)
             if boxes_info:
                 for (x1, y1, x2, y2, label, conf) in boxes_info:
                     cv2.rectangle(
-                        img_contour, (x1, y1), (x2, y2), (0, 255, 0), 2
+                        original_frame, (x1, y1), (x2, y2), (0, 255, 0), 2
                     )
                     cv2.putText(
-                        img_contour,
+                        original_frame,
                         f"{label} {conf:.2f}",
                         (x1, y1 - 10),
                         cv2.FONT_HERSHEY_SIMPLEX,
@@ -405,22 +353,22 @@ class HexsoonController:
                     )
 
                 if object_center is not None:
-                    cv2.circle(img_contour, object_center, 5, (255, 0, 0), cv2.FILLED)
+                    cv2.circle(original_frame, object_center, 5, (255, 0, 0), cv2.FILLED)
 
-            return object_center, img_contour
+            return object_center, original_frame
 
         # -------------------- NO MODE SELECTED --------------------
         else:
             cv2.putText(
-                img_contour,
-                "No detection mode selected",
+                original_frame,
+                "No detection mode/model selected",
                 (10, 30),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
+                0.5,
                 (0, 0, 255),
                 2,
             )
-            return None, img_contour
+            return None, original_frame
 
     def get_velocities(self, oject_center: Optional[tuple[int, int]]):
 
@@ -531,9 +479,9 @@ class HexsoonController:
         img_canny = cv2.Canny(img_grey, self.t1, self.t2)
         img_dilated = cv2.dilate(img_canny, kernel, iterations=1)
 
-        img_contour: np.ndarray | None = frame_display.copy()
+        original_frame: np.ndarray | None = frame_display.copy()
 
-        object_center, img_contour = self.get_object_center(img_dilated, img_contour)
+        object_center, img_contour = self.get_object_center(img_dilated, original_frame)
 
         # DEBUG VISUAL (opcional pero útil)
         cv2.putText(img_contour,f"COLOR: {name}",(10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0) if self.detected_color == "color1" else (0, 0, 0), 2)
