@@ -115,7 +115,7 @@ class HexsoonController:
 
         elif self.try_mode == "Practice":
 
-            self.dron.connect('COM4', 57600)
+            self.dron.connect('COM3', 57600)
 
             print(Fore.GREEN + "Drone connected...")
 
