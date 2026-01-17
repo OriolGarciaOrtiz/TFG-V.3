@@ -42,6 +42,8 @@ class MQTT:
             self.target_gui.controller.up_down = float(data.get("up_down", self.target_gui.controller.up_down))
             self.target_gui.controller.yaw = float(data.get("yaw", self.target_gui.controller.yaw))
             self.target_gui.controller.is_connected = data.get("is_connected", self.target_gui.controller.is_connected)
+
+            self.target_gui.controller.set_velocity()
         except:
             pass
 
@@ -50,18 +52,11 @@ class MQTT:
         msg_dict = {
 
             # HSV values
-            'h_min': self.target_gui.h_min.get(),
-            'h_max': self.target_gui.h_max.get(),
-            's_min': self.target_gui.s_min.get(),
-            's_max': self.target_gui.s_max.get(),
-            'v_min': self.target_gui.v_min.get(),
-            'v_max': self.target_gui.v_max.get(),
+            'colors': self.target_gui.controller.colors,
 
             # Detection and modes
             'detection_mode': self.target_gui.detection_selection.get(),
             'view_mode': self.target_gui.view_selection.get(),
-            'try_mode': self.target_gui.test_selection.get(),
-            'PID_mode': self.target_gui.controller_selection.get(),
             'camera_option': self.target_gui.type_camera_option.get(),
 
             # PID values
@@ -77,7 +72,9 @@ class MQTT:
 
             # Click states 
             'connect_click': self.target_gui.controller.click_connect,
-            'disconnect_click': self.target_gui.controller.click_disconnect
+            'disconnect_click': self.target_gui.controller.click_disconnect,
+
+            'zoom_factor' : self.target_gui.controller.zoom_factor
         }
 
         return json.dumps(msg_dict)
@@ -89,6 +86,7 @@ class MQTT:
         if now - self.clock_start >= self.send_interval:
             try:
                 msg = self.prepare_all_data()
+
                 self.client.publish(self.TOPIC_PUB, msg)
 
                 self.target_gui.controller.click_connect = False

@@ -4,11 +4,12 @@ import time
 
 from HexsoonGUI import GUI
 from VideoRTC import DroneVideoTrack, WebRTCServer
+import cv2
 
 class DroneLauncher:
     def __init__(self):
-        self.video_track_original = DroneVideoTrack()
-        self.video_track_detected = DroneVideoTrack()
+        self.video_track_original = DroneVideoTrack("original")
+        self.video_track_detected = DroneVideoTrack("detected")
         self.gui = GUI()
 
         self.webrtc = WebRTCServer(self.video_track_original, self.video_track_detected)
@@ -19,6 +20,7 @@ class DroneLauncher:
         ).start()
 
     def main(self):
+        
         while True:
             self.gui.update_frame()
 
@@ -29,7 +31,7 @@ class DroneLauncher:
                 self.video_track_original.is_connected = self.gui.controller.is_connected
                 self.video_track_detected.is_connected = self.gui.controller.is_connected
 
-                self.webrtc = self.gui.cam_mode
+                self.webrtc.camera_option = self.gui.controller.type_camera_option
 
             time.sleep(0.01)
 

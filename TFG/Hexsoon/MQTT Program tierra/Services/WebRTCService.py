@@ -5,6 +5,7 @@ from aiortc import RTCPeerConnection, RTCSessionDescription
 from websockets import connect
 from HexsoonGUI import GUI
 from colorama import init, Fore
+import cv2
 
 class DroneVideoReceiver:
     """
@@ -40,7 +41,7 @@ class DroneVideoReceiver:
 
                 frame = await track.recv()
 
-                if frame is None: 
+                if frame is None:
                     return
 
                 img = frame.to_ndarray(format="bgr24")
@@ -73,23 +74,28 @@ class DroneVideoReceiver:
             print(Fore.BLUE + f"Connecting to drone at {self.ip_adress}")
             self.pc = RTCPeerConnection()
 
+            self.pc.addTransceiver("video", direction="recvonly")
+            self.pc.addTransceiver("video", direction="recvonly")
+
         try:
             async with connect(self.ip_adress) as websocket:
                 print(Fore.GREEN + "Connected to WebRTC")
 
                 # Registrar callback para recibir tracks
+                # On the receiver
                 @self.pc.on("track")
                 def on_track(track):
                     if track.kind != "video":
                         return
 
-                    # Asignar por orden
-                    if not hasattr(self, "_video_track_1"):
-                        self._video_track_1 = track
+                    if not hasattr(self, "_video_track_original"):
+                        self._video_track_original = track
                         asyncio.create_task(self.receive_frame(track, "original"))
                     else:
-                        self._video_track_2 = track
+                        self._video_track_detected = track
                         asyncio.create_task(self.receive_frame(track, "detected"))
+
+
 
                 # Esperar oferta SDP del dron
                 message = await websocket.recv()
