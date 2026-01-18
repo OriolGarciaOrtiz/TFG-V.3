@@ -211,7 +211,6 @@ class HexsoonController:
                     send_rc(self.dron, 1500, 1500, 1500, yaw_pwm)  
                     # Ponemos todo a 1500 que es para que se mentanega a la misma altura
 
-
             else:
                 
                 step_x = self.for_back / 100.0

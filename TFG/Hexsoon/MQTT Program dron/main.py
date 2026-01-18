@@ -1,10 +1,9 @@
 import threading
 import asyncio
 import time
-
+import cv2
 from HexsoonGUI import GUI
 from VideoRTC import DroneVideoTrack, WebRTCServer
-import cv2
 
 class DroneLauncher:
     def __init__(self):
@@ -25,15 +24,15 @@ class DroneLauncher:
             self.gui.update_frame()
 
             if self.gui.frame_display is not None:
-                self.video_track_original.frame = self.gui.frame_display
-                self.video_track_detected.frame = self.gui.img_contour
+                self.video_track_original.frame = self.gui.frame_display.copy()
+                self.video_track_detected.frame = self.gui.img_contour.copy()
 
                 self.video_track_original.is_connected = self.gui.controller.is_connected
                 self.video_track_detected.is_connected = self.gui.controller.is_connected
 
                 self.webrtc.camera_option = self.gui.controller.type_camera_option
 
-            time.sleep(0.01)
+            time.sleep(0.03)
 
 
 if __name__ == "__main__":

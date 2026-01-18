@@ -95,9 +95,8 @@ class GUI:
             "up_down": self.controller.up_down,
             "yaw": self.controller.yaw,
             "is_connected": self.controller.is_connected,
+            "detected_color": self.controller.detected_color
         }
-
-        #print(data)
 
         self.send_data(data)
 

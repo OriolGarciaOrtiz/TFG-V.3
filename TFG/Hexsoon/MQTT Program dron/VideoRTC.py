@@ -5,7 +5,6 @@ import json
 import websockets
 from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
 from websockets.exceptions import ConnectionClosed
-import cv2
 
 class DroneVideoTrack(VideoStreamTrack):
     def __init__(self, window_name):
@@ -16,7 +15,11 @@ class DroneVideoTrack(VideoStreamTrack):
 
     async def recv(self):
         # Send black frame if not enabled
-        frame_to_send = self.frame if self.is_connected else np.zeros_like(self.frame)
+        if not self.is_connected or self.frame is None:
+            frame_to_send = np.zeros((240, 320, 3), dtype=np.uint8)
+            
+        else:
+            frame_to_send = self.frame
 
         video_frame = VideoFrame.from_ndarray(frame_to_send, format="bgr24")
         pts, time_base = await self.next_timestamp()
@@ -31,23 +34,16 @@ class WebRTCServer:
     def __init__(self, video_track_original: DroneVideoTrack, video_track_detected: DroneVideoTrack):
         self.video_track_original = video_track_original
         self.video_track_detected = video_track_detected
-        self.camera_option = "Default Cam"
+        self.camera_option = "Raspi Cam"
 
     async def handle_client(self, websocket):
         print("🖥️ Cliente conectado")
 
         pc = RTCPeerConnection()
 
-        # ------------------------------
-        # Use explicit transceivers for two tracks
-        trans_orig = pc.addTransceiver("video", direction="sendonly")
-        pc.addTrack(self.video_track_original)   # Attach track immediately
-
-        trans_detect = pc.addTransceiver("video", direction="sendonly")
+        pc.addTrack(self.video_track_original)
         pc.addTrack(self.video_track_detected)
-        # ------------------------------
 
-        # Create offer
         offer = await pc.createOffer()
         await pc.setLocalDescription(offer)
 

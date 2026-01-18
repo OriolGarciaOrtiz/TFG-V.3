@@ -5,7 +5,7 @@ from aiortc import RTCPeerConnection, RTCSessionDescription
 from websockets import connect
 from HexsoonGUI import GUI
 from colorama import init, Fore
-import cv2
+from aiortc.mediastreams import MediaStreamError
 
 class DroneVideoReceiver:
     """
@@ -28,114 +28,127 @@ class DroneVideoReceiver:
 
         self.running: bool = False
 
+        self.recv_running: bool = False
+
     async def receive_frame(self, track, track_label):
-        """
-        Recibir frames de un track específico y actualizar la GUI.
-        """
         while not self.connected:
             await asyncio.sleep(0.05)
+
         self.start_time = asyncio.get_event_loop().time()
 
         try:
-            while self.running:
-
+            while self.recv_running:
                 frame = await track.recv()
-
-                if frame is None:
-                    return
 
                 img = frame.to_ndarray(format="bgr24")
 
-                # Actualizar GUI según track
                 if "original" in track_label:
                     self.gui.controller.original_frame_RTC = img
                 elif "detected" in track_label:
                     self.gui.controller.detected_frame_RTC = img
-                else:
-                    print(Fore.YELLOW + f"[WARNING] Track unknown: {track_label}")
 
                 self.frame_count += 1
 
+        except MediaStreamError:
+            # ✔ NORMAL shutdown of the video track
+            print(Fore.YELLOW + f"[RTC] Track '{track_label}' closed")
+
+        except asyncio.CancelledError:
+            # ✔ Task cancelled intentionally
+            print(Fore.YELLOW + f"[RTC] Track '{track_label}' task cancelled")
+
         except Exception as e:
-            print(Fore.RED + f"[ERROR] Error receiving frames: {e}")
+            # ❌ Real errors only
+            print(Fore.RED + f"[ERROR] Unexpected RTC error ({track_label}): {e}")
             traceback.print_exc()
 
     async def connect_to_drone(self):
         """
-        Conectar al dron mediante WebSocket + WebRTC solo si el modo es 'Practice'.
+        Conecta al dron mediante WebSocket + WebRTC, negocia el SDP 
+        y gestiona la llegada de múltiples tracks de video.
         """
-        
         async with self.connection_lock:
-
             if self.connected:
-                print(Fore.YELLOW + "[WARNING] Already connected to drone.")
+                print(Fore.YELLOW + "[WARNING] Ya estás conectado al dron.")
                 return
 
-            print(Fore.BLUE + f"Connecting to drone at {self.ip_adress}")
+            print(Fore.BLUE + f"📡 Iniciando conexión con: {self.ip_adress}")
+            
             self.pc = RTCPeerConnection()
 
-            self.pc.addTransceiver("video", direction="recvonly")
-            self.pc.addTransceiver("video", direction="recvonly")
+            tracks_received = []
 
-        try:
-            async with connect(self.ip_adress) as websocket:
-                print(Fore.GREEN + "Connected to WebRTC")
+            @self.pc.on("track")
+            def on_track(track):
+                if track.kind != "video":
+                    return
+                
+                tracks_received.append(track)
+                index = len(tracks_received)
+                
+                if index == 1:
+                    print(Fore.CYAN + "🎥 [RTC] Track 1 recibido: Asignando a ORIGINAL")
+                    asyncio.create_task(self.receive_frame(track, "original"))
+                elif index == 2:
+                    print(Fore.CYAN + "🎥 [RTC] Track 2 recibido: Asignando a DETECTED")
+                    asyncio.create_task(self.receive_frame(track, "detected"))
 
-                # Registrar callback para recibir tracks
-                # On the receiver
-                @self.pc.on("track")
-                def on_track(track):
-                    if track.kind != "video":
-                        return
+            try:
+                async with connect(self.ip_adress) as websocket:
+                    print(Fore.GREEN + "✅ WebSocket conectado. Esperando oferta SDP...")
 
-                    if not hasattr(self, "_video_track_original"):
-                        self._video_track_original = track
-                        asyncio.create_task(self.receive_frame(track, "original"))
+                    # Esperar oferta SDP del dron (el servidor es el que inicia la oferta)
+                    message = await websocket.recv()
+                    data = json.loads(message)
+
+                    if data.get("type") == "sdp" and data.get("sdp_type") == "offer":
+                        # Configurar la descripción remota (oferta del dron)
+                        offer = RTCSessionDescription(
+                            sdp=data["sdp"],
+                            type=data["sdp_type"]
+                        )
+                        await self.pc.setRemoteDescription(offer)
+                        print(Fore.GREEN + "✅ Oferta remota establecida.")
+
+                        # Crear la respuesta (Answer)
+                        answer = await self.pc.createAnswer()
+                        await self.pc.setLocalDescription(answer)
+
+                        # Enviar la respuesta al dron
+                        await websocket.send(json.dumps({
+                            "type": "sdp",
+                            "sdp": self.pc.localDescription.sdp,
+                            "sdp_type": self.pc.localDescription.type
+                        }))
+                        print(Fore.GREEN + "✅ Respuesta SDP enviada.")
+
+                        self.connected = True
+                        self.recv_running = True
+                        print(Fore.MAGENTA + "🚀 Conexión WebRTC establecida. Recibiendo video...")
+
+                        # Mantener la conexión viva mientras el flag connected sea True
+                        while self.connected:
+                            if not self.running: # Si HandlerThreads pide parar
+                                break
+                            await asyncio.sleep(0.1)
+
                     else:
-                        self._video_track_detected = track
-                        asyncio.create_task(self.receive_frame(track, "detected"))
+                        print(Fore.RED + f"[ERROR] Mensaje inesperado del dron: {data.get('type')}")
 
-
-
-                # Esperar oferta SDP del dron
-                message = await websocket.recv()
-                data = json.loads(message)
-
-                if data.get("type") == "sdp" and data.get("sdp_type") == "offer":
-                    offer = RTCSessionDescription(
-                        sdp=data["sdp"],
-                        type=data["sdp_type"]
-                    )
-                    await self.pc.setRemoteDescription(offer)
-
-                    # Crear y enviar answer
-                    answer = await self.pc.createAnswer()
-                    await self.pc.setLocalDescription(answer)
-                    await websocket.send(json.dumps({
-                        "type": "sdp",
-                        "sdp": self.pc.localDescription.sdp,
-                        "sdp_type": self.pc.localDescription.type
-                    }))
-
-                    self.connected = True
-                    print(Fore.GREEN + "WebRTC connection established. Receiving frames...")
-
-                    while self.connected:
-                        await asyncio.sleep(0.1)
-
-                else:
-                    print(Fore.YELLOW + f"[WARNING] Unexpected message from drone: {data.get('type')}")
-
-        except ConnectionRefusedError:
-            print(Fore.RED + f"[ERROR] Cannot connect to {self.ip_adress}. Ensure drone server is running.")
-        except Exception as e:
-            print(Fore.RED + f"[ERROR] Ground station error: {e}")
-            traceback.print_exc()
-        finally:
-            if self.pc:
-                await self.pc.close()
-            self.connected = False
-            print(Fore.BLUE + "Drone connection closed.")
+            except ConnectionRefusedError:
+                print(Fore.RED + f"[ERROR] No se pudo conectar a {self.ip_adress}. ¿Está el servidor del dron encendido?")
+            except Exception as e:
+                print(Fore.RED + f"[ERROR] Error crítico en la estación de tierra: {e}")
+                traceback.print_exc()
+            finally:
+                # Limpieza al cerrar
+                self.connected = False
+                self.recv_running = False
+                self.running = False
+                if self.pc:
+                    await self.pc.close()
+                    self.pc = None
+                print(Fore.BLUE + "🧹 Conexión con el dron cerrada y recursos liberados.")
 
 
     def should_connect_rtc(self) -> bool:

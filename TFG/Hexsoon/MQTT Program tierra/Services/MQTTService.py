@@ -42,6 +42,7 @@ class MQTT:
             self.target_gui.controller.up_down = float(data.get("up_down", self.target_gui.controller.up_down))
             self.target_gui.controller.yaw = float(data.get("yaw", self.target_gui.controller.yaw))
             self.target_gui.controller.is_connected = data.get("is_connected", self.target_gui.controller.is_connected)
+            self.target_gui.controller.detected_color = data.get("detected_color", self.target_gui.controller.detected_color)
 
             self.target_gui.controller.set_velocity()
         except:
