@@ -47,19 +47,15 @@ class WebRTCServer:
         self.video_track_detected = video_track_detected
         self.camera_option = "Raspi Cam"
 
+        self.running = False
+
     async def handle_client(self, websocket):
         print("🖥️ Cliente conectado")
 
         pc = RTCPeerConnection()
 
-        transceiver_original = pc.addTransceiver(
-            self.video_track_original,
-            direction="sendonly"
-        )
-        transceiver_detected = pc.addTransceiver(
-            self.video_track_detected,
-            direction="sendonly"
-        )
+        pc.addTransceiver(self.video_track_original, direction="sendonly")
+        pc.addTransceiver(self.video_track_detected,direction="sendonly")
 
         print("🎥 Tracks enviados: original, detected")
 

@@ -18,6 +18,8 @@ class HexsoonController:
 
         self.colors: dict | None = None
 
+        self.detected_color = None
+
         self.zoom_factor: float = 1.5
 
         self.t1: int = 166
@@ -145,17 +147,19 @@ class HexsoonController:
 
 
     def disconnect_drone(self): 
+        
         if self.is_connected: 
+            
             self.is_connected =  False 
 
 
-    def do_actions(self, connect_click: bool, disconnect_click: bool):
+    def do_actions(self):
 
-        if connect_click:
+        if self.click_connect:
             
             self.connect_drone()
 
-        if disconnect_click:
+        if self.click_disconnect:
             self.disconnect_drone()
 
 
