@@ -37,7 +37,7 @@ class DroneVideoReceiver:
         self.start_time = asyncio.get_event_loop().time()
 
         try:
-            while self.recv_running:
+            while self.recv_running and self.running:
                 frame = await track.recv()
 
                 img = frame.to_ndarray(format="bgr24")
@@ -62,6 +62,9 @@ class DroneVideoReceiver:
             print(Fore.RED + f"[ERROR] Unexpected RTC error ({track_label}): {e}")
             traceback.print_exc()
 
+        finally:
+            print(Fore.MAGENTA + f"[RTC] Track '{track_label}' finalizado en receive_frame")
+
     async def connect_to_drone(self):
         """
         Conecta al dron mediante WebSocket + WebRTC, negocia el SDP 
@@ -76,22 +79,35 @@ class DroneVideoReceiver:
             
             self.pc = RTCPeerConnection()
 
-            tracks_received = []
-
             @self.pc.on("track")
             def on_track(track):
                 if track.kind != "video":
                     return
-                
-                tracks_received.append(track)
-                index = len(tracks_received)
-                
-                if index == 1:
-                    print(Fore.CYAN + "🎥 [RTC] Track 1 recibido: Asignando a ORIGINAL")
+
+                # Buscar el transceiver asociado a este track
+                transceiver = next(
+                    (
+                        t for t in self.pc.getTransceivers()
+                        if t.receiver and t.receiver.track == track
+                    ),
+                    None
+                )
+
+                if not transceiver:
+                    print("⚠️ [RTC] No se encontró transceiver para el track")
+                    return
+
+                mid = transceiver.mid
+                print(f"🎥 [RTC] Track recibido con MID={mid}")
+
+                if mid == "0":
                     asyncio.create_task(self.receive_frame(track, "original"))
-                elif index == 2:
-                    print(Fore.CYAN + "🎥 [RTC] Track 2 recibido: Asignando a DETECTED")
+
+                elif mid == "1":
                     asyncio.create_task(self.receive_frame(track, "detected"))
+
+                else:
+                    print(f"⚠️ [RTC] MID desconocido: {mid}")
 
             try:
                 async with connect(self.ip_adress) as websocket:
@@ -141,14 +157,14 @@ class DroneVideoReceiver:
                 print(Fore.RED + f"[ERROR] Error crítico en la estación de tierra: {e}")
                 traceback.print_exc()
             finally:
-                # Limpieza al cerrar
                 self.connected = False
                 self.recv_running = False
-                self.running = False
+
                 if self.pc:
                     await self.pc.close()
                     self.pc = None
-                print(Fore.BLUE + "🧹 Conexión con el dron cerrada y recursos liberados.")
+
+                print(Fore.BLUE + "🧹 Conexión con el dron cerrada")
 
 
     def should_connect_rtc(self) -> bool:
@@ -164,11 +180,13 @@ class DroneVideoReceiver:
 
             print(Fore.BLUE + "Disconnecting from drone...")
             self.connected = False
+            self.recv_running = False
+
 
     async def connection_manager(self):
         last_state = None
 
-        while True:
+        while self.running:
             current_state = self.should_connect_rtc()
 
             if current_state != last_state:
@@ -187,12 +205,28 @@ class DroneVideoReceiver:
 
     def start(self):
         try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            self.loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.loop)
 
-            loop.create_task(self.connection_manager())
-            loop.run_forever()
+            self.loop.create_task(self.connection_manager())
+            self.loop.run_forever()
 
         except Exception as e:
             print(Fore.RED + f"[ERROR] Exception in receiver start: {e}")
             traceback.print_exc()
+
+        finally:
+            if self.loop:
+                self.loop.close()
+                print(Fore.BLUE + "[RTC] Event loop cerrado")
+
+
+    def stop(self):
+        self.running = False
+        self.recv_running = False
+        self.connected = False
+
+        if self.loop and self.loop.is_running():
+            self.loop.call_soon_threadsafe(self.loop.stop)
+
+

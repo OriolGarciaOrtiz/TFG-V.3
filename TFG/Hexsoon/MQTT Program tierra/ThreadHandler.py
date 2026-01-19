@@ -29,7 +29,7 @@ class HandlerThreads:
 
             if self.target_gui.controller.type_camera_option != "Raspi Cam":
 
-                self.receiver.running = False
+                self.receiver.stop()
 
                 print(Fore.GREEN + "Stoping Video Reciever Thread")
 

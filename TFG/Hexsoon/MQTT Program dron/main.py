@@ -19,20 +19,20 @@ class DroneLauncher:
         ).start()
 
     def main(self):
-        
         while True:
             self.gui.update_frame()
 
+            # Actualiza los frames aunque no estés conectado aún
             if self.gui.frame_display is not None:
                 self.video_track_original.frame = self.gui.frame_display.copy()
+            if self.gui.img_contour is not None:
                 self.video_track_detected.frame = self.gui.img_contour.copy()
 
-                self.video_track_original.is_connected = self.gui.controller.is_connected
-                self.video_track_detected.is_connected = self.gui.controller.is_connected
-
-                self.webrtc.camera_option = self.gui.controller.type_camera_option
+            # Mantener la cámara seleccionada en el WebRTC
+            self.webrtc.camera_option = self.gui.controller.type_camera_option
 
             time.sleep(0.03)
+
 
 
 if __name__ == "__main__":

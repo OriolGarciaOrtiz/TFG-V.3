@@ -5,6 +5,7 @@ import json
 import websockets
 from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
 from websockets.exceptions import ConnectionClosed
+import cv2
 
 class DroneVideoTrack(VideoStreamTrack):
     def __init__(self, window_name):
@@ -14,19 +15,29 @@ class DroneVideoTrack(VideoStreamTrack):
         self.window_name = window_name
 
     async def recv(self):
-        # Send black frame if not enabled
-        if not self.is_connected or self.frame is None:
-            frame_to_send = np.zeros((240, 320, 3), dtype=np.uint8)
-            
-        else:
-            frame_to_send = self.frame
+        try:
+            # Decide qué frame enviar
+            if not self.is_connected or self.frame is None:
+                frame_to_send = np.zeros((240, 320, 3), dtype=np.uint8)
+            else:
+                frame_to_send = self.frame
 
-        video_frame = VideoFrame.from_ndarray(frame_to_send, format="bgr24")
-        pts, time_base = await self.next_timestamp()
-        video_frame.pts = pts
-        video_frame.time_base = time_base
+            # 🔹 Asegurar que el frame sea 3D
+            if frame_to_send.ndim == 2:  # si es H×W, convertir a H×W×3
+                frame_to_send = cv2.cvtColor(frame_to_send, cv2.COLOR_GRAY2BGR)
 
-        await asyncio.sleep(1/30)
+            video_frame = VideoFrame.from_ndarray(frame_to_send, format="bgr24")
+            pts, time_base = await self.next_timestamp()
+            video_frame.pts = pts
+            video_frame.time_base = time_base
+
+            await asyncio.sleep(1/30)
+
+        except Exception as e:
+            print(f"[recv ERROR] {e}")
+            # Si falla, enviar frame negro seguro
+            video_frame = VideoFrame.from_ndarray(np.zeros((240, 320, 3), dtype=np.uint8), format="bgr24")
+
         return video_frame
 
 
@@ -41,8 +52,16 @@ class WebRTCServer:
 
         pc = RTCPeerConnection()
 
-        pc.addTrack(self.video_track_original)
-        pc.addTrack(self.video_track_detected)
+        transceiver_original = pc.addTransceiver(
+            self.video_track_original,
+            direction="sendonly"
+        )
+        transceiver_detected = pc.addTransceiver(
+            self.video_track_detected,
+            direction="sendonly"
+        )
+
+        print("🎥 Tracks enviados: original, detected")
 
         offer = await pc.createOffer()
         await pc.setLocalDescription(offer)
@@ -65,9 +84,8 @@ class WebRTCServer:
                     await pc.setRemoteDescription(answer)
 
                     # Enable video frames if using Raspi Cam
-                    enabled = (self.camera_option == "Raspi Cam")
-                    self.video_track_original.is_connected = enabled
-                    self.video_track_detected.is_connected = enabled
+                    self.video_track_original.is_connected = True
+                    self.video_track_detected.is_connected = True
                     print("✅ WebRTC conectado")
 
         except ConnectionClosed:
