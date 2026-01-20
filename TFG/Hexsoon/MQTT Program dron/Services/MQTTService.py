@@ -78,6 +78,8 @@ class MQTT:
         self.target_gui.controller.click_disconnect = self._to_bool(data.get("disconnect_click", False))
 
         self.target_gui.controller.zoom_factor = float(data.get("zoom_factor", self.target_gui.controller.zoom_factor))
+
+        self.target_gui.controller.yolo_model_name = data.get("yolo_model_name", self.target_gui.controller.yolo_model_name)
         
         self.target_gui.controller.do_actions()
 

@@ -82,6 +82,8 @@ class HexsoonController:
 
         self.yolo_result: tuple[tuple[int, int] | None, list] = (None, [])
 
+        self.yolo_model_name: str | None = None
+
 
     def load_model(self):
 
@@ -91,14 +93,20 @@ class HexsoonController:
             filetypes=[("PyTorch model (*.pt)", "*.pt")]
         )
 
-        try: 
+        if archivo is not None and archivo != "":
 
-            self.model = YOLO(archivo)
-            print(Fore.GREEN + "YOLO model correctly loaded")
+            try: 
 
-        except:
+                self.model = YOLO(archivo)
+                print(Fore.GREEN + "YOLO model correctly loaded")
 
-            print(Fore.RED + "Error loading YOLO model")
+                if self.type_camera_option == "Raspi Cam":
+
+                    self.yolo_model_name = archivo
+
+            except:
+
+                print(Fore.RED + "Error loading YOLO model")
 
 
     def connect_drone(self):

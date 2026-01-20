@@ -208,7 +208,9 @@ class DroneVideoReceiver:
             self.loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self.loop)
 
-            self.loop.create_task(self.connection_manager())
+            self.running = True
+            self.connection_task = self.loop.create_task(self.connection_manager())
+
             self.loop.run_forever()
 
         except Exception as e:
@@ -216,9 +218,8 @@ class DroneVideoReceiver:
             traceback.print_exc()
 
         finally:
-            if self.loop:
-                self.loop.close()
-                print(Fore.BLUE + "[RTC] Event loop cerrado")
+            self._shutdown_loop()
+            print(Fore.BLUE + "[RTC] Event loop cerrado")
 
 
     def stop(self):
@@ -228,5 +229,22 @@ class DroneVideoReceiver:
 
         if self.loop and self.loop.is_running():
             self.loop.call_soon_threadsafe(self.loop.stop)
+
+
+
+    def _shutdown_loop(self):
+        pending = asyncio.all_tasks(loop=self.loop)
+
+        for task in pending:
+            task.cancel()
+
+        if pending:
+            self.loop.run_until_complete(
+                asyncio.gather(*pending, return_exceptions=True)
+            )
+
+        self.loop.close()
+        print(Fore.BLUE + "[RTC] Event loop cerrado limpiamente")
+
 
 

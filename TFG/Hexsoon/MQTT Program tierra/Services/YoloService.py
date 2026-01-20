@@ -1,6 +1,7 @@
 from HexsoonGUI import GUI
 import numpy as np
-from typing import Optional, Tuple
+import time
+
 
 class ServiceYolo:
 
@@ -15,12 +16,12 @@ class ServiceYolo:
     def start(self):
 
         while self.running:
-
-            yolo_img, _ = self.target_gui.controller.cap_frame(self.target_gui.controller.type_camera_option)
                         
             try:
 
-                if yolo_img is not None:
+                yolo_img, _ = self.target_gui.controller.cap_frame(self.target_gui.controller.type_camera_option)
+
+                if yolo_img is not None and self.target_gui.controller.model is not None:
 
                     if yolo_img.dtype != np.uint8:
                         yolo_img = yolo_img.astype(np.uint8)
@@ -59,12 +60,13 @@ class ServiceYolo:
 
                 else:
 
-                    self.yolo_result = (None, [])
-
-                    print("No img")
+                    self.target_gui.controller.yolo_result = (None, [])
 
             except Exception as e:
 
                 print(e)
                     
-                self.yolo_result = (None, [])
+                self.target_gui.controller.yolo_result = (None, [])
+
+            
+            time.sleep(1/self.target_gui.FPS)

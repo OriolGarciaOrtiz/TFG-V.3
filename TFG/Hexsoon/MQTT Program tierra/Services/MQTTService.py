@@ -75,7 +75,9 @@ class MQTT:
             'connect_click': self.target_gui.controller.click_connect,
             'disconnect_click': self.target_gui.controller.click_disconnect,
 
-            'zoom_factor' : self.target_gui.controller.zoom_factor
+            'zoom_factor' : self.target_gui.controller.zoom_factor,
+
+            'yolo_model_name' : self.target_gui.controller.yolo_model_name
         }
 
         return json.dumps(msg_dict)

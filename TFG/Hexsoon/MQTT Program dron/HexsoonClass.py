@@ -58,13 +58,11 @@ class HexsoonController:
         self.up_down = 0
         self.yaw = 0
 
+        self.yolo_model_name: str | None = None
 
-        try:
-            self.model = YOLO("Yolo Models/best_RC_Final.pt")
-            print("YOLO model loaded successfully.")
-        except Exception as e:
-            print("Could not load YOLO model:", e)
-            self.model = None
+        self.last_yolo_model_name: str | None = None
+
+        self.model: YOLO | None = None
 
         yamlname: str = 'calibration_data_px.yaml'
         self.data: dict | None = None
@@ -160,7 +158,28 @@ class HexsoonController:
             self.connect_drone()
 
         if self.click_disconnect:
+            
             self.disconnect_drone()
+
+        if self.last_yolo_model_name != self.yolo_model_name and self.detection_mode == "Neural Network":
+
+            self.load_model()
+
+            self.last_yolo_model_name = self.yolo_model_name
+
+
+    def load_model(self):
+
+        if self.yolo_model_name is not None and self.yolo_model_name != "":
+
+            try:
+                
+                self.model = YOLO(self.yolo_model_name)
+                print("YOLO model correctly loaded")
+
+            except:
+
+                print("Error loading YOLO model")
 
 
     def get_contour(self, frame):
