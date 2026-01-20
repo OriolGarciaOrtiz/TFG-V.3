@@ -84,6 +84,9 @@ class HexsoonController:
 
         self.yolo_model_name: str | None = None
 
+        self.original = None
+        self.img_contour = None
+
 
     def load_model(self):
 
@@ -281,6 +284,8 @@ class HexsoonController:
                 ret, frame = self.cap.read()
                 if not ret:
                     return None, None
+                
+                frame = self.zoom_frame(frame, zoom_factor=self.zoom_factor)
 
                 return self.get_detected_frame(frame)
 
@@ -447,6 +452,16 @@ class HexsoonController:
         frame_display: np.ndarray | None = cv2.resize(frame, (self.panel_width, self.panel_height))
         frame_hsv: np.ndarray | None = cv2.cvtColor(frame_display, cv2.COLOR_BGR2HSV)
 
+        if self.detection_mode == "Neural Network":
+            # Keep original frame intact
+            original_copy = frame_display.copy()
+
+            object_center, img_contour = self.get_object_center(original_copy, frame_display)
+            self.get_velocities(object_center)
+
+            return original_copy, img_contour
+
+
         c1, c2 = self.colors["primary"]["range"], self.colors["secondary"]["range"]
 
         # -------- COLOR 1 --------
@@ -505,6 +520,7 @@ class HexsoonController:
         self.get_velocities(object_center)
 
         return img_dilated, img_contour
+    
 
     def get_frame(self) -> tuple[Optional[np.ndarray], Optional[np.ndarray]]:
 

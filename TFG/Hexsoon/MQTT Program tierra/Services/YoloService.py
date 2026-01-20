@@ -19,7 +19,7 @@ class ServiceYolo:
                         
             try:
 
-                yolo_img, _ = self.target_gui.controller.cap_frame(self.target_gui.controller.type_camera_option)
+                yolo_img = self.target_gui.controller.original
 
                 if yolo_img is not None and self.target_gui.controller.model is not None:
 

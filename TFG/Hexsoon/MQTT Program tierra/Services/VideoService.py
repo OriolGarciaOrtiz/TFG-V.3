@@ -23,7 +23,8 @@ class ServiceVideo:
                 # Get frames from queue
                 original_frame, detected_frame = None, None
                 if self.target_gui.controller.is_connected:
-                    original_frame, detected_frame = self.target_gui.controller.get_frame()
+                    original_frame = self.target_gui.controller.original
+                    detected_frame = self.target_gui.controller.img_contour
 
                 # Convert frames for display
                 frames_to_show = []

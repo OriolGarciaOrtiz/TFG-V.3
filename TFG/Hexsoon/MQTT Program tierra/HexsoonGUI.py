@@ -540,6 +540,9 @@ class GUI:
                 status_text = "Connected"
                 color = "green"
                 self.is_connected = True
+
+                self.controller.original, self.controller.img_contour = self.controller.cap_frame(self.controller.type_camera_option)
+
             else:
                 status_text = "Not Connected"
                 color = "red"
@@ -553,10 +556,11 @@ class GUI:
 
             self.update_velocity_labels()
 
+
         except Exception as e:
             print(Fore.RED + f"Error in update_frame: {e}")
 
-        self.root.after(30, self.update_frame)
+        self.root.after(int(1000 / self.FPS), self.update_frame)
 
 
     def on_close(self):
