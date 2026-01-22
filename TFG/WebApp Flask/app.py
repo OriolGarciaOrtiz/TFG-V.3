@@ -41,8 +41,13 @@ def handle_image(data):
 
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, host="0.0.0.0", port=5000)
-
+    socketio.run(
+        app,
+        debug=True,
+        host="0.0.0.0",
+        port=5000,
+        allow_unsafe_werkzeug=True
+    )
 
 # Movil: http://192.168.1.132:5000
 # Movil si estamos en red local: http://10.219.188.39:5000
@@ -50,6 +55,3 @@ if __name__ == '__main__':
 
 
 
-#Movil: http://192.168.1.132:5000
-#Movil si estamos en red local (con los datos del movil: http://10.219.188.39:5000
-#Pc:http://127.0.0.1:5000/

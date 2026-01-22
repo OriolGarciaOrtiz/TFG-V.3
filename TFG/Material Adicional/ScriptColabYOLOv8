@@ -1,0 +1,17 @@
+
+!pip install ultralytics
+from ultralytics import YOLO
+#!unzip -q YOLOv5Dataset_Horse_Bird.zip
+!unzip -q YOLOv5Dataset.zip -d YOLOv5Dataset
+
+model = YOLO("yolov8s.pt")  #Este archivo son pesos preentrenados oficiales de Ultralytics, entrenados en el dataset COCO completo.
+                            #Vienen ya incluidos en el paquete ultralytics.
+
+model.train(
+    data="YOLOv5Dataset/dataset.yaml",
+    epochs=450,                             # nº de épocas
+    imgsz=640,                              # tamaño de imagen
+    batch=4,                                # tamaño de batch (ajustar según RAM)
+    workers=2,                               # threads de dataloader (ajustar según GPU)
+    patience=150
+)
