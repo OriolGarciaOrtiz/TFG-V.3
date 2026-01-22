@@ -20,6 +20,6 @@ colorama
 opencv-python
 pillow
 Flask-SocketIO
-yalm
+yaml
 pyyaml
 typing
