@@ -10,6 +10,7 @@ from dronLink.modules.dron_move import _prepare_command_mov
 from dronLink.modules.dron_RC_override import send_rc
 from colorama import init, Fore
 from typing import Optional, Tuple
+import os
 
 
 class HexsoonController:
@@ -105,7 +106,7 @@ class HexsoonController:
 
                 if self.type_camera_option == "Raspi Cam":
 
-                    self.yolo_model_name = archivo
+                    self.yolo_model_name = "Yolo Models/" + os.path.basename(archivo)
 
             except:
 
