@@ -30,24 +30,19 @@ class App:
         self.master = master
         self.master.title("Hexsoon Camera Interface")
 
-        # Parámetros
         self.panel_width = 320
         self.panel_height = 240
-        self.capture_interval = 0.25  # segundos entre fotos
+        self.capture_interval = 0.25
 
-        # Cámara
         self.cap = None
         self.is_connected = False
         self.stop_stream = False
 
-        # Flags de captura
         self.pause_capture = False
         self.capture_running = False
 
-        # Carpeta destino
         self.output_folder = None
 
-        # --- UI ---
         self.connect_button = tk.Button(
             master, text="Conectar Cámara", command=self.connect_camera
         )
@@ -128,7 +123,6 @@ class App:
         if self.capture_running:
             return
 
-        # Pedir carpeta de destino
         folder = filedialog.askdirectory(title="Selecciona carpeta para guardar las fotos")
         if not folder:
             return

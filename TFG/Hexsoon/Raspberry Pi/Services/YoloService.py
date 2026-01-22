@@ -1,5 +1,5 @@
 import numpy as np
-from HexsoonGUI import GUI
+from ..HexsoonGUI import GUI
 import time
 
 

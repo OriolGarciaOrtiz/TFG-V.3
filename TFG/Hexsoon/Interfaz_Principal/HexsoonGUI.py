@@ -56,7 +56,6 @@ class GUI:
 
 
     def run_in_thread(self, target_func):
-        """Helper to run actions in background threads"""
 
         def task():
             try:
@@ -162,7 +161,7 @@ class GUI:
 
         hmin, hmax, smin, smax, vmin, vmax = values
 
-        # Update sliders directly
+
         self.h_min.set(hmin)
         self.h_max.set(hmax)
         self.s_min.set(smin)
@@ -170,8 +169,7 @@ class GUI:
         self.v_min.set(vmin)
         self.v_max.set(vmax)
 
-        # Update the currently selected color values
-        current_color = self.color_sel.get()  # "Color 1" or "Color 2"
+        current_color = self.color_sel.get()
         self.color_values[current_color] = {
             "preset": preset,
             "h_min": hmin, "h_max": hmax,
@@ -187,7 +185,6 @@ class GUI:
         if not values:
             return
 
-        # Restore last slider values for this color
         self.h_min.set(values["h_min"])
         self.h_max.set(values["h_max"])
         self.s_min.set(values["s_min"])
@@ -195,7 +192,6 @@ class GUI:
         self.v_min.set(values["v_min"])
         self.v_max.set(values["v_max"])
 
-        # Restore preset dropdown
         self.color_opt.set(values.get("preset", self.color_menu[0]))
 
 
@@ -564,8 +560,6 @@ class GUI:
 
 
     def on_close(self):
-
-        self.controller.yolo_running = False
 
         if self.controller.is_connected:
             self.controller.Return_To_Launch_drone()

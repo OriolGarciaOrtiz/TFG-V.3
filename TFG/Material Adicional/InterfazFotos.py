@@ -7,6 +7,10 @@ from PIL import Image, ImageTk
 import os
 import time
 
+# ----------------------------
+# Cambiar ruta !!!!!!!!!!!!!!
+# ----------------------------
+
 TRAIN_PATH = r"C:\Users\joela\Desktop\Datasets\FotosDron\images\train"
 VAL_PATH   = r"C:\Users\joela\Desktop\Datasets\FotosDron\images\val"
 
@@ -76,7 +80,7 @@ class App:
                 continue
 
             img_display = cv2.resize(frame, (self.panel_width, self.panel_height))
-            img_contour = img_display.copy()   # <- requerido
+            img_contour = img_display.copy()
 
             img_rgb = cv2.cvtColor(img_contour, cv2.COLOR_BGR2RGB)
             img_pil = Image.fromarray(img_rgb)

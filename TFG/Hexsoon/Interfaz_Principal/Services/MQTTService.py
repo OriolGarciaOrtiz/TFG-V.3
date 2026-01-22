@@ -52,15 +52,12 @@ class MQTT:
         """Prepare COMPLETE data package with ALL parameters"""
         msg_dict = {
 
-            # HSV values
             'colors': self.target_gui.controller.colors,
 
-            # Detection and modes
             'detection_mode': self.target_gui.detection_selection.get(),
             'view_mode': self.target_gui.view_selection.get(),
             'camera_option': self.target_gui.type_camera_option.get(),
 
-            # PID values
             'Kp_x': self.target_gui.Kp_x.get(),
             'Ki_x': self.target_gui.Ki_x.get(),
             'Kd_x': self.target_gui.Kd_x.get(),
@@ -68,10 +65,8 @@ class MQTT:
             'Ki_y': self.target_gui.Ki_y.get(),
             'Kd_y': self.target_gui.Kd_y.get(),
 
-            # Other settings
             'max_velocity': self.target_gui.max_velocity.get(),
 
-            # Click states 
             'connect_click': self.target_gui.controller.click_connect,
             'disconnect_click': self.target_gui.controller.click_disconnect,
 

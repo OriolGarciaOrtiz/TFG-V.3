@@ -2,7 +2,6 @@ from ultralytics import YOLO
 from djitellopy import Tello
 import os
 import threading
-import tkinter as tk
 from tkinter import filedialog
 
 

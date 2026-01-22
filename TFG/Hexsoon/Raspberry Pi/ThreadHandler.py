@@ -37,7 +37,6 @@ class HandlerThreads:
 
         self.RTC.camera_option = self.target_gui.controller.type_camera_option
 
-        # Solo activar/desactivar la transmisión de frames según la cámara
         if self.target_gui.controller.type_camera_option == "Raspi Cam":
             self.video_track_original.is_connected = True
             self.video_track_detected.is_connected = True

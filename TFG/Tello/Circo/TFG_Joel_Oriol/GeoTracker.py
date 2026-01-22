@@ -33,7 +33,6 @@ class GeoTracker:
 
         self.area_corners = [(float(a), float(b)) for (a, b) in area_corners[:4]]
 
-        # ventana y canvas
         self.canvas_width, self.canvas_height = canvas_size
         self.padding = padding
         self.map_title = map_title

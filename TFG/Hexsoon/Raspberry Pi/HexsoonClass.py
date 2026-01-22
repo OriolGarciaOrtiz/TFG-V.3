@@ -191,12 +191,10 @@ class HexsoonController:
 
         c1, c2 = self.colors["primary"]["range"], self.colors["secondary"]["range"]
 
-        # -------- COLOR 1 --------
         lower1 = np.array(c1[0])
         upper1 = np.array(c1[1])
         mask1 = cv2.inRange(frame_hsv, lower1, upper1)
 
-        # -------- COLOR 2 --------
         lower2 = np.array(c2[0])
         upper2 = np.array(c2[1])
         mask2 = cv2.inRange(frame_hsv, lower2, upper2)
@@ -205,7 +203,6 @@ class HexsoonController:
         mask1 = cv2.dilate(mask1, kernel, iterations=1)
         mask2 = cv2.dilate(mask2, kernel, iterations=1)
 
-        # -------- SELECCIÓN DEL COLOR DOMINANTE --------
         def max_area(mask):
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             if not contours:
@@ -229,7 +226,6 @@ class HexsoonController:
             mask = np.zeros_like(mask1)
             self.detected_color = None
 
-        # -------- PIPELINE ORIGINAL --------
         result = cv2.bitwise_and(frame_display, frame_display, mask=mask)
 
         img_blur = cv2.GaussianBlur(result, (7, 7), 1)
@@ -241,7 +237,6 @@ class HexsoonController:
 
         object_center, img_contour = self.get_object_center(img_dilated, original_frame)
 
-        # DEBUG VISUAL (opcional pero útil)
         cv2.putText(img_contour,f"COLOR: {name}",(10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0) if self.detected_color == "color1" else (0, 0, 0), 2)
 
         self.get_velocities(object_center)
@@ -325,7 +320,6 @@ class HexsoonController:
 
             return None, original_frame
 
-        # -------------------- NEURAL NETWORK MODE --------------------
         elif self.detection_mode == "Neural Network" and self.model is not None:
 
             object_center, boxes_info = self.yolo_result
@@ -350,7 +344,6 @@ class HexsoonController:
 
             return object_center, original_frame
 
-        # -------------------- NO MODE SELECTED --------------------
         else:
             cv2.putText(
                 original_frame,
@@ -371,12 +364,10 @@ class HexsoonController:
 
         c1, c2 = self.colors["primary"]["range"], self.colors["secondary"]["range"]
 
-        # -------- COLOR 1 --------
         lower1 = np.array(c1[0])
         upper1 = np.array(c1[1])
         mask1 = cv2.inRange(frame_hsv, lower1, upper1)
 
-        # -------- COLOR 2 --------
         lower2 = np.array(c2[0])
         upper2 = np.array(c2[1])
         mask2 = cv2.inRange(frame_hsv, lower2, upper2)
@@ -385,7 +376,6 @@ class HexsoonController:
         mask1 = cv2.dilate(mask1, kernel, iterations=1)
         mask2 = cv2.dilate(mask2, kernel, iterations=1)
 
-        # -------- SELECCIÓN DEL COLOR DOMINANTE --------
         def max_area(mask):
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             if not contours:
@@ -409,7 +399,6 @@ class HexsoonController:
             mask = np.zeros_like(mask1)
             self.detected_color = None
 
-        # -------- PIPELINE ORIGINAL --------
         result = cv2.bitwise_and(frame_display, frame_display, mask=mask)
 
         img_blur = cv2.GaussianBlur(result, (7, 7), 1)
@@ -421,7 +410,6 @@ class HexsoonController:
 
         object_center, img_contour = self.get_object_center(img_dilated, original_frame)
 
-        # DEBUG VISUAL (opcional pero útil)
         cv2.putText(img_contour,f"COLOR: {name}",(10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0) if self.detected_color == "color1" else (0, 0, 0), 2)
 
         self.get_velocities(object_center)

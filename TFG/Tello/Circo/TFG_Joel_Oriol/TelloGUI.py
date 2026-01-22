@@ -23,12 +23,12 @@ class GUI:
         self.controller = DroneController()
 
 
-        self.yolo_queue = Queue(maxsize=1) #Cola con capacidad de un frame
-        self.yolo_result = (None, 0, 0, []) #Inizializamos lo que tiene que devolver la función para cuando sea vacio
+        self.yolo_queue = Queue(maxsize=1)
+        self.yolo_result = (None, 0, 0, [])
         self.yolo_lock = threading.Lock()
 
 
-        self._yolo_worker = threading.Thread(target=self._yolo_worker_loop, daemon=True) #Dejamos de forma infinita recorrer esta función en segundo plano
+        self._yolo_worker = threading.Thread(target=self._yolo_worker_loop, daemon=True)
         self._yolo_worker.start()
 
         self.game_mode = mode
@@ -40,7 +40,6 @@ class GUI:
         self._game_worker = threading.Thread(target=self._game_worker_loop, daemon=True)
         self._game_worker.start()
 
-        #GeoTracker
         lat1=41.2754531
         lon1=1.9862720
         lat2=41.2754107
@@ -49,7 +48,7 @@ class GUI:
         lon3 = 1.9862066
         lat4=41.2754339
         lon4=1.9861872
-        self.yaw_deg=0 #Habrá que fijar uno en concreto dependiendo de donde esté el norte
+        self.yaw_deg=0
         self.create_map_widget()
         self.tracker = GeoTracker(
             initial_lat=41.2754266,
@@ -93,11 +92,7 @@ class GUI:
         self.hsv_blue_min = 10
         self.hsv_blue_max = 35
 
-        #self.flask_server = None
-
         self.last_detection_mode = None
-
-
 
         self.hsv_widgets = []
         self.hsv_slider_rows = []
@@ -108,19 +103,15 @@ class GUI:
         self.color_game_widgets = []
         self.color_actions = {}
 
-        # Offset de acciones (MoveUp, MoveDown, RotateCW…)
         self.offset_lr = 0
         self.offset_fb = 0
         self.offset_ud = 0
         self.offset_yaw = 0
 
-        # Tiempo (ms) de duración del offset
         self.offset_duration_ms = 1000
 
-        # Timestamp para resetear
         self.offset_timestamp = 0
 
-        # Para evitar repetir varias veces la misma acción
         self.action_active = False
         self.block_PID = False
 
@@ -134,7 +125,6 @@ class GUI:
         self.root.title("Tello Drone Controller")
         self.root.geometry("1920x1080")
 
-        # Create all GUI elements
         self.create_connection_widgets()
         self.create_control_buttons()
         self.create_calibration_buttons()
@@ -146,7 +136,7 @@ class GUI:
         self.create_distance_controls()
 
     def create_connection_widgets(self):
-        # Connection status
+
         self.connected_label = Label(self.root, text="Not Connected", font=("Arial", 12))
         self.connected_label.grid(row=0, column=0, padx=5, pady=10)
 
@@ -172,7 +162,7 @@ class GUI:
     def create_map_widget(self):
         map_frame = tk.LabelFrame(self.root, text="Mapa GEO", padx=5, pady=5)
         map_frame.place(x=950, y=370)
-        # Canvas dentro del frame (aquí sí puede ser pack)
+
         self.map_canvas = tk.Canvas(map_frame, width=500, height=375, bg="white")
         self.map_canvas.pack()
 
@@ -195,7 +185,7 @@ class GUI:
     def create_mode_selectors(self):
 
         simulation_label = tk.Label(self.root, text="Simulation Mode:", font=("Arial", 12))
-        simulation_label.grid(row=1, column=3, padx=(20, 5), pady=10, sticky="w")  # Added sticky="w"
+        simulation_label.grid(row=1, column=3, padx=(20, 5), pady=10, sticky="w")
 
         self.simulation_var = tk.StringVar(value="True")
         simulation_dropdown = tk.OptionMenu(self.root, self.simulation_var, "True", "False")
@@ -218,7 +208,7 @@ class GUI:
         self.load_button.grid(row=2, column=8)
 
     def create_pid_controls(self):
-        # Initialize PID variables
+
         self.Kp_x = tk.DoubleVar(value=0.42)
         self.Ki_x = tk.DoubleVar(value=0.0005)
         self.Kd_x = tk.DoubleVar(value=1.9)
@@ -231,7 +221,6 @@ class GUI:
         self.Ki_z = tk.DoubleVar(value=0)
         self.Kd_z = tk.DoubleVar(value=1.2)
 
-        # --- X Axis ---
         tk.Label(self.root, text="Kp-X (Proportional)").grid(row=1, column=5, padx=5, pady=5)
         tk.Scale(self.root, from_=0, to=2.0, resolution=0.01, orient="horizontal",
                  variable=self.Kp_x, length=200).grid(row=2, column=5, padx=5, pady=5)
@@ -244,7 +233,6 @@ class GUI:
         tk.Scale(self.root, from_=0, to=5, resolution=0.1, orient="horizontal",
                  variable=self.Kd_x, length=200).grid(row=2, column=7, padx=5, pady=5)
 
-        # --- Y Axis ---
         tk.Label(self.root, text="Kp-Y (Proportional)").grid(row=3, column=5, padx=5, pady=5)
         tk.Scale(self.root, from_=0, to=2.0, resolution=0.01, orient="horizontal",
                  variable=self.Kp_y, length=200).grid(row=4, column=5, padx=5, pady=5)
@@ -257,7 +245,6 @@ class GUI:
         tk.Scale(self.root, from_=0, to=5, resolution=0.1, orient="horizontal",
                  variable=self.Kd_y, length=200).grid(row=4, column=7, padx=5, pady=5)
 
-        # --- Z Axis ---
         tk.Label(self.root, text="Kp-Z (Proportional)").grid(row=5, column=5, padx=5, pady=5)
         tk.Scale(self.root, from_=0, to=2.0, resolution=0.01, orient="horizontal",
                  variable=self.Kp_z, length=200).grid(row=6, column=5, padx=5, pady=5)
@@ -270,7 +257,6 @@ class GUI:
         tk.Scale(self.root, from_=0, to=5, resolution=0.1, orient="horizontal",
                  variable=self.Kd_z, length=200).grid(row=6, column=7, padx=5, pady=5)
 
-        # --- Max Velocity ---
         tk.Label(self.root, text="Max velocity").grid(row=7, column=3, padx=5, pady=5)
         self.max_velocity = tk.DoubleVar(value=60)
         tk.Scale(self.root, from_=0, to=60, resolution=1, orient="horizontal",
@@ -314,14 +300,11 @@ class GUI:
 
     def create_hsv_sliders(self):
 
-        #self.h_min, self.h_max = tk.IntVar(value=35), tk.IntVar(value=85)
         self.s_min, self.s_max = tk.IntVar(value=55), tk.IntVar(value=255)
         self.v_min, self.v_max = tk.IntVar(value=100), tk.IntVar(value=255)
         self.t1, self.t2 = tk.IntVar(value=166), tk.IntVar(value=171)
 
         sliders_config = [
-            #(self.h_min, "Hue Min:", 1),
-            #(self.h_max, "Hue Max:", 2),
             (self.s_min, "Sat Min:", 3),
             (self.s_max, "Sat Max:", 4),
             (self.v_min, "Value Min:", 5),
@@ -361,7 +344,7 @@ class GUI:
 
         def load_img(path):
             img = Image.open(path)
-            img = img.resize((75, 75), Image.Resampling.LANCZOS)  # redimensiona
+            img = img.resize((75, 75), Image.Resampling.LANCZOS)
             return ImageTk.PhotoImage(img)
 
         self.horse_img = load_img("TFG_Joel_oriol/Fotos/horse.jpg")
@@ -394,7 +377,7 @@ class GUI:
             dropdown.config(width=7)
 
             self.game_widgets.append((frame, dropdown))
-            self.game_actions[animal] = action_var  # <--- ASOCIA ANIMAL → ACCIÓN
+            self.game_actions[animal] = action_var
 
 
 
@@ -444,7 +427,6 @@ class GUI:
                                    command=lambda _: self.update_distance_fields())
         dropdown_dist.grid(row=3, column=9)
 
-        # Distance control fields
         self.label_h = Label(self.root, text="Object size (cm):  H =", font=("Arial", 12))
         self.label_w = Label(self.root, text="W =", font=("Arial", 12))
         self.label_dist = Label(self.root, text="Desired Distance (cm):", font=("Arial", 12))
@@ -453,11 +435,9 @@ class GUI:
         self.entry_height = tk.Entry(self.root, width=10)
         self.entry_dist = tk.Entry(self.root, width=10)
 
-        # ArUco fields
         self.marker_length_label = Label(self.root, text="Marker length (cm):", font=("Arial", 12))
         self.marker_length_entry = tk.Entry(self.root, width=10)
 
-        # Default values
         self.entry_height.insert(0, "27.5")
         self.entry_width.insert(0, "20.5")
         self.entry_dist.insert(0, "110")
@@ -468,7 +448,6 @@ class GUI:
     def update_distance_fields(self):
         mode = self.opt_dist_method.get()
 
-        # Hide all widgets
         for w in [
             self.label_h, self.label_w, self.label_dist, self.dist_label,
             self.entry_width, self.entry_height, self.entry_dist,
@@ -537,10 +516,10 @@ class GUI:
         if mode == "Game Mode":
 
             positions = [
-                (10, 100),  # F1
-                (95, 100),  # F2
-                (10, 220),  # F3
-                (95, 220)  # F4
+                (10, 100),
+                (95, 100),
+                (10, 220),
+                (95, 220)
             ]
 
             for (frame, dd), (x, y) in zip(self.game_widgets, positions):
@@ -564,7 +543,7 @@ class GUI:
 
             return
 
-    def reset_offsets(self): #IMP
+    def reset_offsets(self):
         self.offset_lr = 0
         self.offset_fb = 0
         self.offset_ud = 0
@@ -606,11 +585,6 @@ class GUI:
             self.controller.me.streamon()
             print(f"Connected! Battery: {self.controller.me.get_battery()}%")
             self.connected_label.config(text="Connected", fg="green")
-
-            #if not self.flask_server:
-                #print("Starting Flask server on port 5000...")
-                #self.flask_server = FlaskServer(host="0.0.0.0", port=5000)
-                #self.flask_server.start()
 
             self.update_frame()
         except Exception as e:
@@ -767,9 +741,7 @@ class GUI:
         color_bgr = (0, 255, 0) if detected_color == "green" else (255, 0, 0)
         cv2.circle(img_contour, (cx, cy), 5, color_bgr, -1)
         cv2.rectangle(img_contour, (cx - w // 2, cy - h // 2),
-                      (cx + w // 2, cy + h // 2), color_bgr, 2) #Aqui tienes los 4 vertices, comparar coordenadas con limites del frame
-        #cv2.putText(img_contour, f"{detected_color.upper()} ({w}x{h})",
-                    #(cx - 50, cy - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color_bgr, 2)
+                      (cx + w // 2, cy + h // 2), color_bgr, 2)
 
         return (cx, cy), w, h, detected_color
 
@@ -794,7 +766,7 @@ class GUI:
         purple_info = get_largest_contour(mask_purple)
 
         infos = [(green_info, "green"), (orange_info, "orange"), (blue_info, "blue"), (purple_info, "purple")]
-        infos = [i for i in infos if i[0] is not None]  # eliminar None
+        infos = [i for i in infos if i[0] is not None]
 
         if not infos:
             return None, None, None, None
@@ -835,7 +807,7 @@ class GUI:
         object_center = None
         w = h = 0
         max_area = 0
-        boxes_info = []  # [(x1, y1, x2, y2, label, conf)]
+        boxes_info = []
 
         for r in results:
             for box in r.boxes:
@@ -875,7 +847,7 @@ class GUI:
         max_area = 0
         best_box = None
         detected_label = None
-        boxes_info = []  # [(x1, y1, x2, y2, label_name, conf)]
+        boxes_info = []
 
         for r in results:
             for box in r.boxes:
@@ -968,8 +940,6 @@ class GUI:
             self.dist_label.config(text="[Pinhole] No object detected")
             return None
 
-
-    #El error es demasiado pequeño, para este metodo habría que subir los kp,i,d o hacer el error más grande multiplicando por 100 por ejemplo
     def distance_by_hand(self, w ,h):
         if w and h and self.w_det and self.h_det:
             area = w * h
@@ -999,7 +969,7 @@ class GUI:
 
         mode = self.opt_dist_method.get()
         if mode != "Manual distance":
-            max_delta = 20  # Salto de 20 cm en menos de 30 ms peligroso
+            max_delta = 20
             if not hasattr(self, "last_valid_distance") or self.last_valid_distance is None:
                 self.last_valid_distance = distance
                 return False
@@ -1013,7 +983,7 @@ class GUI:
             return False
 
     def update_yaw(self, yaw_velocity, dt):
-        # yaw_velocity viene en grados/seg
+
         self.yaw_deg += yaw_velocity * dt
         self.yaw_deg %= 360
         return self.yaw_deg
@@ -1045,7 +1015,6 @@ class GUI:
                 upper_blue = np.array([self.hsv_blue_max, self.s_max.get(), self.v_max.get()])
                 mask_blue = cv2.inRange(img_hsv, lower_blue, upper_blue)
 
-                # Combinar resultados (solo uno se usará tras comparar áreas)
                 mask_combined = cv2.bitwise_or(mask_green, mask_blue)
                 result = cv2.bitwise_and(img_display, img_display, mask=mask_combined)
 
@@ -1055,7 +1024,6 @@ class GUI:
                 kernel = np.ones((5, 5), np.uint8)
                 img_dil = cv2.dilate(img_canny, kernel, iterations=1)
 
-                #detectar contornos y determinar color dominante
                 object_center, w, h, detected_color = self.detect_objects_color_contour_dual(mask_green, mask_blue,
                                                                                              img_contour)
 
@@ -1063,12 +1031,10 @@ class GUI:
                 self.opt_cam.set("Mirror")
 
                 try:
-                    #.put_nowait lo que hace en la cola de un frame es:
-                    #Si esta cola está vacia entonces añadiremos a la cola el último frame y como el bucle de yolo_worker no para procesaremos esa imagen
                     self.yolo_queue.put_nowait(img_contour.copy())
                     print("Usando ultimo frame")
                 except queue.Full:
-                    pass #Si la cola está llena es porque el anterior frame todavía no se ha procesado ya que .predict tarda mucho en ejecutarse, entonces ignoraremos el nuevo frame y seguiremos trabajando con el anterior resultado/frame el cual ya estaba procesado
+                    pass 
                     print("YOLO ocupado: usando frame anterior")
                 with self.yolo_lock:
                     object_center, w, h, boxes_info = self.yolo_result
@@ -1145,8 +1111,7 @@ class GUI:
                 object_center, w, h, detected_color = self.detect_objects_color_contour_dual_gamemode(
                     mask_green, mask_orange, mask_blue, mask_purple, img_contour)
                 if detected_color is not None and detected_color != self.action_done_for_label:
-                    #Si hay un cambio de color quizas deberiamos de meter una espera de tiempo porque entre el cambio de color
-                    #el area se modifica y esto puede provar cambios de velocidad for_back drásticos
+
                     if self.game_mode == "Color Game Mode":
                         if detected_color in self.color_actions:
                             action = self.color_actions[detected_color].get()
@@ -1345,39 +1310,35 @@ class GUI:
                     self.controller.up_down_velocity = 0
                     self.controller.yaw_velocity = 0
                     self.controller.me.send_rc_control(0, 0, 0, 0)
-                    #Para que no se acumulen los errores al quitar el modo simulación:
+
                     self.controller.integral_x = 0
                     self.controller.integral_y = 0
                     self.controller.integral_z = 0
                     self.controller.prev_error_x = 0
                     self.controller.prev_error_y = 0
                     self.controller.prev_error_z = 0
-                    #print("Estamos en modo simulacion")
+
                 elif self.simulation_var.get() == "False" and self.block_PID == False:
 
                     if (time.time() - self.offset_timestamp) * 1000 > self.offset_duration_ms:
                         self.reset_offsets()
 
-                    # Velocidades PID
                     lr = int(self.controller.left_right_velocity)
                     fb = int(self.controller.for_back_velocity)
                     ud = int(self.controller.up_down_velocity)
                     yaw = int(self.controller.yaw_velocity)
 
-                    # Sumar offsets
                     lr += self.offset_lr
                     fb += self.offset_fb
                     ud += self.offset_ud
                     yaw += self.offset_yaw
 
-                    # Clampear
                     max_v = self.max_velocity.get()
                     lr = np.clip(lr, -max_v, max_v)
                     fb = np.clip(fb, -max_v, max_v)
                     ud = np.clip(ud, -max_v, max_v)
                     yaw = np.clip(yaw, -max_v, max_v)
 
-                    # Enviar control
                     self.controller.me.send_rc_control(int(lr), int(fb), int(ud), int(yaw))
 
                     self.lr_label.config(text=f"Left-Right Velocity = {self.controller.left_right_velocity}")
@@ -1401,10 +1362,7 @@ class GUI:
                 self.controller.prev_error_y = 0
                 self.controller.prev_error_z = 0
                 self.controller.me.send_rc_control(0, 0, 0, 0)
-                # Para que no se acumulen los errores al quitar el modo simulación:
 
-
-            #frames_to_show = [img_dil if detection_mode == "Color Contour" else img_display, img_contour]
             frames_to_show = [img_display, img_contour]
             for labels, f in zip(self.video_labels, frames_to_show):
                 if len(f.shape) == 2:

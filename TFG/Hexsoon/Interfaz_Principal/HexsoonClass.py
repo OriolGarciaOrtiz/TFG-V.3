@@ -213,7 +213,7 @@ class HexsoonController:
                     
                     yaw_pwm = 1500 + int(yaw_input * 150)  
                     # Para que la velocidad no sea super alta le ponemos un límite de +-150 porque si queremos 
-                    # usar los mismos Kp,Ki,Kd que los de left right el yaw se mueve demasiado según las pruebas 
+                    # usar los mismos Kp, Ki, Kd que los de left right el yaw se mueve demasiado según las pruebas 
                     # que he hecho en simulación
                     
                     yaw_pwm = max(1100, min(1900, yaw_pwm))  
@@ -275,7 +275,6 @@ class HexsoonController:
 
     def cap_frame(self, mode: str) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
 
-        # ------------------------- PC CAMERA MODE -------------------------
         if mode == "Default Cam":
 
             try:
@@ -293,14 +292,12 @@ class HexsoonController:
             except:
                 return None, None
 
-        # ------------------------- PC CAMERA MODE -------------------------
         elif mode == "Raspi Cam":
             if self.original_frame_RTC is None:
                 return None, None
 
             return self.original_frame_RTC, self.detected_frame_RTC
 
-        # ------------------------- Panoramic CAMERA MODE -------------------------
         elif mode == "Panoramic Cam":
 
             try:
@@ -317,7 +314,6 @@ class HexsoonController:
                 x, y, w, h = roi
                 u_img = cv2.undistort(frame, cam_matrix, dist_coefs, None, new_cam_mtx)
 
-                # crop and save the undistorted image
                 dst = u_img[y:y + h, x:x + w]
                 dst = cv2.flip(dst, 1)
 
@@ -328,7 +324,6 @@ class HexsoonController:
             except:
                 return None, None
 
-        # ------------------------- UNKNOWN MODE -------------------------
         return None, None
 
 
@@ -354,7 +349,6 @@ class HexsoonController:
 
             return None, original_frame
 
-        # -------------------- NEURAL NETWORK MODE --------------------
         elif self.detection_mode == "Neural Network" and self.model is not None:
 
             object_center, boxes_info = self.yolo_result
@@ -379,7 +373,6 @@ class HexsoonController:
 
             return object_center, original_frame
 
-        # -------------------- NO MODE SELECTED --------------------
         else:
             cv2.putText(
                 original_frame,
@@ -454,7 +447,7 @@ class HexsoonController:
         frame_hsv: np.ndarray | None = cv2.cvtColor(frame_display, cv2.COLOR_BGR2HSV)
 
         if self.detection_mode == "Neural Network":
-            # Keep original frame intact
+
             original_copy = frame_display.copy()
 
             object_center, img_contour = self.get_object_center(original_copy, frame_display)
@@ -465,12 +458,10 @@ class HexsoonController:
 
         c1, c2 = self.colors["primary"]["range"], self.colors["secondary"]["range"]
 
-        # -------- COLOR 1 --------
         lower1 = np.array(c1[0])
         upper1 = np.array(c1[1])
         mask1 = cv2.inRange(frame_hsv, lower1, upper1)
 
-        # -------- COLOR 2 --------
         lower2 = np.array(c2[0])
         upper2 = np.array(c2[1])
         mask2 = cv2.inRange(frame_hsv, lower2, upper2)
@@ -479,7 +470,6 @@ class HexsoonController:
         mask1 = cv2.dilate(mask1, kernel, iterations=1)
         mask2 = cv2.dilate(mask2, kernel, iterations=1)
 
-        # -------- SELECCIÓN DEL COLOR DOMINANTE --------
         def max_area(mask):
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             if not contours:
@@ -503,7 +493,6 @@ class HexsoonController:
             mask = np.zeros_like(mask1)
             self.detected_color = None
 
-        # -------- PIPELINE ORIGINAL --------
         result = cv2.bitwise_and(frame_display, frame_display, mask=mask)
 
         img_blur = cv2.GaussianBlur(result, (7, 7), 1)
@@ -515,7 +504,6 @@ class HexsoonController:
 
         object_center, img_contour = self.get_object_center(img_dilated, original_frame)
 
-        # DEBUG VISUAL (opcional pero útil)
         cv2.putText(img_contour,f"COLOR: {name}",(10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0) if self.detected_color == "color1" else (0, 0, 0), 2)
 
         self.get_velocities(object_center)

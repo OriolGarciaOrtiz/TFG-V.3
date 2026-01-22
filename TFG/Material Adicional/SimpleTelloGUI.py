@@ -23,16 +23,13 @@ class SimpleTelloGUI:
         self.root.title("Simple Tello Drone Controller")
         self.root.geometry("1920x1080")
 
-        # Column 0 = controls, PID; Column 1 = video
         self.root.grid_columnconfigure(0, weight=0)
         self.root.grid_columnconfigure(1, weight=1)
 
-        # Row weights for full expansion in column 1
         self.root.grid_rowconfigure(0, weight=1)
         self.root.grid_rowconfigure(1, weight=1)
         self.root.grid_rowconfigure(2, weight=1)
 
-        # Create a left-side frame to hold controls + PID
         left_frame = tk.Frame(self.root)
         left_frame.grid(row=0, column=0, rowspan=3, sticky="nsew", padx=10, pady=10)
         left_frame.grid_rowconfigure(0, weight=0)
@@ -44,22 +41,18 @@ class SimpleTelloGUI:
         self.create_tle_widgets(parent=left_frame)
         self.create_PID_widgets(parent=left_frame)
 
-        # Video frame in column 1
         self.create_video_frame()
 
     def create_tle_widgets(self, parent):
         button_frame = tk.LabelFrame(parent, text="Drone Controlling", padx=10, pady=10)
         button_frame.grid(row=1, column=0, padx=20, pady=10, sticky="n")
 
-        # Connect button
         self.take_off_btn = tk.Button(button_frame, text="Take-off", width=34, command=self.controller.safe_takeoff)
         self.take_off_btn.grid(row=0, column=0, padx=10, pady=10)
 
-        # Connection status
         self.landing_btn = tk.Button(button_frame, text="Land", width=34, command=self.controller.landing)
         self.landing_btn.grid(row=1, column=0, padx=10, pady=10)
 
-        # Battery label
         self.emergency_btn = tk.Button(button_frame, text="Emergency", width=34, command=self.controller.emergency)
         self.emergency_btn.grid(row=2, column=0, padx=10, pady=10)
 
@@ -67,15 +60,12 @@ class SimpleTelloGUI:
         control_frame = tk.LabelFrame(parent, text="Drone Connection", padx=10, pady=10)
         control_frame.grid(row=0, column=0, padx=20, pady=10, sticky="n")
 
-        # Connect button
         self.connect_btn = tk.Button(control_frame, text="Connect", width=15, command=self.drone_connection)
         self.connect_btn.grid(row=0, column=0, padx=10, pady=10)
 
-        # Connection status
         self.connection_lbl = tk.Label(control_frame, text="Not Connected", fg="red", font=("Arial", 12))
         self.connection_lbl.grid(row=0, column=1, padx=10, pady=10)
 
-        # Battery label
         self.battery_lbl = tk.Label(control_frame, text="Battery: --%", fg="red", font=("Arial", 12))
         self.battery_lbl.grid(row=1, column=0, columnspan=2, pady=5)
 

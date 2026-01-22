@@ -17,3 +17,9 @@ selenium
 pywin32
 pyserial
 colorama
+opencv-python
+pillow
+Flask-SocketIO
+yalm
+pyyaml
+typing

@@ -1,7 +1,7 @@
 import paho.mqtt.client as mqtt
 import json
 import time
-from HexsoonGUI import GUI
+from ..HexsoonGUI import GUI
 
 class MQTT:
 
@@ -9,7 +9,6 @@ class MQTT:
 
         self.target_gui = target_gui
 
-        # MQTT config
         self.BROKER = "broker.hivemq.com"
         self.PORT = 1883
         self.TOPIC_SUB = "test/chat/tierra2dron"
@@ -24,7 +23,6 @@ class MQTT:
         self.clock_start = time.monotonic()
         self.send_interval = 0.05
 
-        # Button states
         self.connect_click = False 
         self.disconnect_mode = False 
 
@@ -44,7 +42,6 @@ class MQTT:
             print("Invalid MQTT message:", e)
 
 
-    # Convert values safely to bool
     def _to_bool(self, val):
         if isinstance(val, bool):
             return val
