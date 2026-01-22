@@ -1,7 +1,7 @@
 import paho.mqtt.client as mqtt
 import json
 import time
-from ..HexsoonGUI import GUI
+from HexsoonGUI import GUI
 
 class MQTT:
 
