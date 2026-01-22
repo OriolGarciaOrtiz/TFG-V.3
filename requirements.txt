@@ -16,3 +16,4 @@ folium
 selenium
 pywin32
 pyserial
+colorama

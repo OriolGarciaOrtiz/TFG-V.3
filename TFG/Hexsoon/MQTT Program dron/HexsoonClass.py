@@ -173,6 +173,8 @@ class HexsoonController:
         if self.yolo_model_name is not None and self.yolo_model_name != "":
 
             try:
+
+                print(self.yolo_model_name)
                 
                 self.model = YOLO(self.yolo_model_name)
                 print("YOLO model correctly loaded")

@@ -23,8 +23,8 @@ class DroneVideoReceiver:
 
         init(autoreset=True)
 
-        self.ip_adress = "ws://127.0.0.1:9999"             # En caso que se quieran hacer pruebas en local
-        #self.ip_adress = "ws://192.168.1.102:9999"       # Para cuando se quieran hacer pruebas de vuelo
+        #self.ip_adress = "ws://127.0.0.1:9999"             # En caso que se quieran hacer pruebas en local
+        self.ip_adress = "ws://192.168.1.101:9999"       # Para cuando se quieran hacer pruebas de vuelo
 
         self.running: bool = False
 
