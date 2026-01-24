@@ -2,7 +2,7 @@ from TelloGUI import *
 import tkinter as tk
 from tkinter import messagebox
 
-def main(mode: str):
+def main():
     try:
 
         root = tk.Tk()
@@ -11,7 +11,7 @@ def main(mode: str):
 
         root.state('zoomed')
 
-        tello_gui = GUI(root, mode)
+        tello_gui = GUI(root)
 
         tello_gui.update_frame()
 
@@ -27,9 +27,4 @@ def main(mode: str):
 
 if __name__ == "__main__":
 
-    #  Modos para el circo, así no hace falta separar el codigo
-    #  "Color Contour", "Neural Network", "Game Mode", "Color Game Mode"
-
-    mode = "Color Game Mode"
-
-    main(mode)
+    main()
