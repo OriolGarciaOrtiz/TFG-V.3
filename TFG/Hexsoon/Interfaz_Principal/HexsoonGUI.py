@@ -22,7 +22,7 @@ class GUI:
 
         init(autoreset=True)
 
-        self.FPS: int = 45
+        self.FPS: int = 30
 
         self.user32 = ctypes.windll.user32
         self.PrintWindow = self.user32.PrintWindow
@@ -556,7 +556,7 @@ class GUI:
         except Exception as e:
             print(Fore.RED + f"Error in update_frame: {e}")
 
-        self.root.after(int(1000 / self.FPS), self.update_frame)
+        self.root.after(int(1000 / self.FPS), self.update_frame)  
 
 
     def on_close(self):
