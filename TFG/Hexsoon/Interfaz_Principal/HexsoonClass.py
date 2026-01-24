@@ -106,7 +106,7 @@ class HexsoonController:
 
                 if self.type_camera_option == "Raspi Cam":
 
-                    self.yolo_model_name = "Yolo Models/" + os.path.basename(archivo)
+                    self.yolo_model_name = "../../Yolo Models/" + os.path.basename(archivo)
 
             except:
 

@@ -362,6 +362,15 @@ class HexsoonController:
         frame_display: np.ndarray | None = cv2.resize(frame, (self.panel_width, self.panel_height))
         frame_hsv: np.ndarray | None = cv2.cvtColor(frame_display, cv2.COLOR_BGR2HSV)
 
+        if self.detection_mode == "Neural Network":
+
+            original_copy = frame_display.copy()
+
+            object_center, img_contour = self.get_object_center(original_copy, frame_display)
+            self.get_velocities(object_center)
+
+            return original_copy, img_contour
+
         c1, c2 = self.colors["primary"]["range"], self.colors["secondary"]["range"]
 
         lower1 = np.array(c1[0])
