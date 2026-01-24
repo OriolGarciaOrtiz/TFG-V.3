@@ -22,7 +22,7 @@ class GUI:
 
         init(autoreset=True)
 
-        self.FPS: int = 100
+        self.FPS: int = 75
 
         self.user32 = ctypes.windll.user32
         self.PrintWindow = self.user32.PrintWindow
