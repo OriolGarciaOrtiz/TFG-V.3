@@ -20,8 +20,8 @@ from HexsoonGUI import GUI
 class MissionPlanner:
     def __init__(self, target_gui: GUI):
         self.target_gui = target_gui
-        self.mission_panel_height = 400
-        self.mission_panel_width = int(self.mission_panel_height * 16 / 9)
+        self.mission_panel_height = self.target_gui.misson_panel_heigth
+        self.mission_panel_width = self.target_gui.misson_panel_width
 
         self.dron: Dron = self.target_gui.controller.dron
 

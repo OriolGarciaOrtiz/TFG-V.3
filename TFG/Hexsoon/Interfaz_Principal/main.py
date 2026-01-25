@@ -9,7 +9,7 @@ def main():
         root = tk.Tk()
 
         root.title("Hexagon Drone")
-        root.state('zoomed')
+        root.attributes('-fullscreen', True)
 
         hexsoon_gui = HexsoonGUI(root)
 
