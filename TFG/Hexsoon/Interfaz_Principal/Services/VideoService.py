@@ -45,8 +45,11 @@ class ServiceVideo:
                 if mission_frame is None:
 
                     mission_frame = np.zeros((self.target_gui.misson_panel_width, self.target_gui.misson_panel_heigth, 3), dtype=np.uint8)
-                    cv2.putText(mission_frame, "Mission Planner not found",
+                    cv2.putText(mission_frame, "Mission Planner", 
                                 (20, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+
+                    cv2.putText(mission_frame, "not found", 
+                                (20, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
                 else:
                     mission_frame = cv2.cvtColor(mission_frame, cv2.COLOR_BGR2RGB)

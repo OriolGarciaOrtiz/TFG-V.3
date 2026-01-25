@@ -27,8 +27,8 @@ class HexsoonController:
         self.detected_color: str | None = None
         self.model: YOLO | None = None
 
-        self.panel_width: int = 320
-        self.panel_height: int = 240
+        self.panel_height: int = 300
+        self.panel_width: int = int(self.panel_height * 320/240)
 
         self.colors: dict | None = None
 

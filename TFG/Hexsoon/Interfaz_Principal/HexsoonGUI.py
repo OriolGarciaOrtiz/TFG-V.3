@@ -18,7 +18,7 @@ class GUI:
         self.original_frame, self.detected_frame, self.mission_frame = None, None, None
         self.controller = HexsoonController()
 
-        self.misson_panel_heigth: int = 400
+        self.misson_panel_heigth: int = self.controller.panel_height
         self.misson_panel_width: int = int(self.misson_panel_heigth * 16 / 9)
 
         init(autoreset=True)
@@ -446,24 +446,24 @@ class GUI:
 
 
     def create_video_panels(self):
-        container = tk.Frame(self.root)
-        container.place(relx=0.5, rely=0.9, anchor="s", relwidth=1.0, height=400)
+        container = tk.LabelFrame(self.root, text="Video Frames")
+        container.grid(row=10, column=0, columnspan=8, sticky="nw", padx=10, pady=10)
         self.video_labels = []
 
         hsv_frame = tk.Frame(container)
         hsv_frame.grid(row=0, column=0, padx=25)
-        tk.Label(hsv_frame, text="HSV Mask", font=("Arial", 12)).pack(pady=(0, 2))
+        tk.Label(hsv_frame, text="HSV Mask", font=("Arial", 12)).pack(pady=(0, 5))
         hsv_lbl = tk.Label(hsv_frame, width=self.controller.panel_width, height=self.controller.panel_height,
                            bg="black")
-        hsv_lbl.pack()
+        hsv_lbl.pack(pady=(0, 10))
         self.video_labels.append(hsv_lbl)
 
         contour_frame = tk.Frame(container)
         contour_frame.grid(row=0, column=1, padx=25)
-        tk.Label(contour_frame, text="Contour", font=("Arial", 12)).pack(pady=(0, 2))
+        tk.Label(contour_frame, text="Contour", font=("Arial", 12)).pack(pady=(0, 5))
         contour_lbl = tk.Label(contour_frame, width=self.controller.panel_width, height=self.controller.panel_height,
                                bg="black")
-        contour_lbl.pack()
+        contour_lbl.pack(pady=(0, 10))
         self.video_labels.append(contour_lbl)
 
         mission_frame = tk.Frame(container)
@@ -471,7 +471,7 @@ class GUI:
         tk.Label(mission_frame, text="MissionPlanner", font=("Arial", 12)).pack(pady=(0, 5))
         mission_lbl = tk.Label(mission_frame, width=self.misson_panel_width, height=self.misson_panel_heigth,
                                bg="black")
-        mission_lbl.pack(pady=(0, 30))
+        mission_lbl.pack(pady=(0, 10))
         self.video_labels.append(mission_lbl)
 
 
