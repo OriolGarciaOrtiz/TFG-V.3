@@ -53,8 +53,6 @@ class GUI:
         self.create_hsv_sliders()
         self.create_pid_controls()
         self.create_velocity_display()
-        self.create_zoom_slider()
-
 
     def run_in_thread(self, target_func):
 
@@ -71,12 +69,15 @@ class GUI:
 
 
     def create_connection_widgets(self):
-        self.connected_label = Label(self.root, text="Not Connected", font=("Arial", 14))
+
+        self.connection_frame = tk.LabelFrame(self.root, text="Connection")
+        self.connection_frame.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=10, pady=10)
+
+        self.connected_label = Label(self.connection_frame, text="Not Connected", font=("Arial", 14))
         self.connected_label.grid(row=0, column=0, padx=10, pady=10)
 
-        self.connect_button = tk.Button(self.root, text="Connect",
-                                        command=lambda: self.run_in_thread(self.controller.connect_drone))
-        self.connect_button.grid(row=0, column=1, padx=10, pady=10)
+        tk.Button(self.connection_frame, text="Connect",
+                command=lambda: self.run_in_thread(self.controller.connect_drone)).grid(row=0, column=1, padx=10, pady=10)
 
 
     def load_colors(self, path: str):
@@ -226,53 +227,38 @@ class GUI:
 
 
     def create_control_buttons(self):
-        self.color_opt = tk.StringVar(value=self.color_menu[0])
-        self.color_menu_widget = tk.OptionMenu(self.root, self.color_opt, *self.color_menu)
-        self.color_menu_widget.grid(row=7, column=1, padx=10, pady=10)
 
-        self.color_sel = tk.StringVar(value="Color 1")
-        color_selection = tk.OptionMenu(self.root, self.color_sel,
-                                            "Color 1", "Color 2")
-        color_selection.grid(row=7, column=0, padx=10, pady=10)
+        self.extra_contros_frame = tk.LabelFrame(self.root, text="Controls")
+        self.extra_contros_frame.grid(column=2, row=0, padx=10, pady=10, columnspan=2, rowspan=4, sticky="nsew")
 
-        self.create_color_button = tk.Button(self.root, text="Create Color",
-                                         command=lambda: self.create_color())
-        self.create_color_button.grid(column=0, row=8, padx=10, pady=10)
+        tk.Label(self.extra_contros_frame, text="Take-off alt:", font=("Arial", 14)).grid(column=0, row=0, padx=25, pady=10)
 
-        self.color_opt.trace_add("write", self.apply_color_preset)
-        self.color_sel.trace_add("write", self.switch_color)
-
-        tk.Label(self.root, text="Take-off alt:", font=("Arial", 14)).grid(column=2, row=0)
-
-        self.takeoff_height = tk.Entry(self.root, width=10)
+        self.takeoff_height = tk.Entry(self.extra_contros_frame, width=10)
         self.takeoff_height.insert(0, "2")
-        self.takeoff_height.grid(column=3, row=0, padx=10, pady=10)
+        self.takeoff_height.grid(column=1, row=0, padx=25, pady=10)
 
-        self.take_off_button = tk.Button(self.root, text="Arm and Take-off",
-                                         command=lambda: self.run_in_thread(self.controller.take_off_drone))
-        self.take_off_button.grid(column=2, row=1, padx=10, pady=10)
+        tk.Button(self.extra_contros_frame, text="Arm and Take-off",
+            command=lambda: self.run_in_thread(self.controller.take_off_drone)).grid(column=0, row=1, padx=25, pady=10)
 
-        self.landing_button = tk.Button(self.root, text="Landing",
-                                        command=lambda: self.run_in_thread(self.controller.land_drone))
-        self.landing_button.grid(column=2, row=2, padx=10, pady=10)
+        tk.Button(self.extra_contros_frame, text="Landing",
+            command=lambda: self.run_in_thread(self.controller.land_drone)).grid(column=1, row=1, padx=25, pady=10)
 
-        self.disconnect_button = tk.Button(self.root, text="Disconnect",
-                                           command=lambda: self.run_in_thread(self.controller.disconnect_drone))
-        self.disconnect_button.grid(column=3, row=2, padx=10, pady=10)
+        tk.Button(self.extra_contros_frame, text="Disconnect",
+            command=lambda: self.run_in_thread(self.controller.disconnect_drone)).grid(column=0, row=2, padx=25, pady=10)
 
-        self.RTL_button = tk.Button(self.root, text="RTL",
-                                    command=lambda: self.run_in_thread(self.controller.Return_To_Launch_drone))
-        self.RTL_button.grid(column=3, row=1, padx=10, pady=10)
+        tk.Button(self.extra_contros_frame, text="RTL",
+            command=lambda: self.run_in_thread(self.controller.Return_To_Launch_drone)).grid(column=1, row=2, padx=25, pady=10)
         
-        self.load_model_button = tk.Button(self.root, text="Load Yolo model", 
-                                        command=lambda: self.run_in_thread(self.controller.load_model))
-        self.load_model_button.grid(column=1, row=8, padx=10, pady=10)
+        Label(self.extra_contros_frame, text="Panoramic Zoom", font=("Arial", 12)).grid(row=3, column=0, padx=25, pady=10)
+        self.zoom_var = tk.DoubleVar(value=1.5)
+        tk.Scale(self.extra_contros_frame, from_=1.0, to=20, resolution=0.1, orient="horizontal",
+            variable=self.zoom_var, length=200).grid(row=3, column=1, padx=25, pady=10)
 
 
     def create_mode_selectors(self):
 
         modes_frame = tk.LabelFrame(self.root, text="Selection Modes", padx=10, pady=10)
-        modes_frame.grid(row=0, column=4, columnspan=4, rowspan=5, sticky="nw", padx=10, pady=10)
+        modes_frame.grid(row=0, column=4, columnspan=4, rowspan=2, sticky="nwse", padx=10, pady=10)
 
         tk.Label(modes_frame, text="Detection Mode:", font=("Arial", 14)).grid(row=0, column=0, padx=10, pady=10, sticky="w")
         self.detection_selection = tk.StringVar(value="Color Contour")
@@ -302,7 +288,7 @@ class GUI:
         self.Kd_y = tk.DoubleVar(value=0)
 
         pid_frame = tk.LabelFrame(self.root, text="PID Control", padx=10, pady=10)
-        pid_frame.grid(row=4, column=4, columnspan=4, rowspan=5, sticky="nw", padx=10, pady=10)
+        pid_frame.grid(row=2, column=4, columnspan=4, rowspan=5, sticky="nwse", padx=10, pady=10)
 
         self.create_pid_grid(pid_frame)
 
@@ -340,9 +326,13 @@ class GUI:
 
 
     def create_hsv_sliders(self):
+
         self.h_min, self.h_max = tk.IntVar(value=35), tk.IntVar(value=85)
         self.s_min, self.s_max = tk.IntVar(value=55), tk.IntVar(value=255)
         self.v_min, self.v_max = tk.IntVar(value=100), tk.IntVar(value=255)
+
+        self.color_frame = tk.LabelFrame(self.root, text="Colors")
+        self.color_frame.grid(column=0, row=1, columnspan=2, rowspan=8, sticky="nwse", padx=10, pady=10)
 
         sliders_config = [
             (self.h_min, "Hue Min:"),
@@ -373,76 +363,81 @@ class GUI:
                 val = 179
 
             slider = tk.Scale(
-                self.root,
+                self.color_frame,
                 from_=0, to=val,
                 orient="horizontal",
                 variable=var,
                 length=200,
                 command=on_slide
             )
-            slider.grid(row=i + 1, column=1)
+            slider.grid(row=i, column=1, padx=10)
 
-            Label(self.root, text=text, font=("Arial", 12)).grid(row=i + 1, column=0)
+            Label( self.color_frame, text=text, font=("Arial", 12)).grid(row=i, column=0)
 
+        self.color_opt = tk.StringVar(value=self.color_menu[0])
+        self.color_menu_widget = tk.OptionMenu(self.color_frame, self.color_opt, *self.color_menu)
+        self.color_menu_widget.grid(row=6, column=1, padx=10, pady=10)
 
-    def create_zoom_slider(self):
-        Label(self.root, text="Panoramic Zoom", font=("Arial", 12)).grid(row=8, column=2, padx=10, pady=5)
+        self.color_sel = tk.StringVar(value="Color 1")
+        color_selection = tk.OptionMenu(self.color_frame, self.color_sel,
+                                            "Color 1", "Color 2")
+        color_selection.grid(row=6, column=0, padx=10, pady=10)
 
-        self.zoom_var = tk.DoubleVar(value=1.5)
+        self.create_color_button = tk.Button(self.color_frame, text="Create Color",
+                                         command=lambda: self.create_color())
+        self.create_color_button.grid(column=0, row=7, padx=10, pady=10)
 
-        zoom_slider = tk.Scale(
-            self.root,
-            from_=1.0,
-            to=20,
-            resolution=0.1,
-            orient="horizontal",
-            variable=self.zoom_var,
-            length=200
-        )
-        zoom_slider.grid(row=8, column=3, padx=10, pady=5)
+        self.color_opt.trace_add("write", self.apply_color_preset)
+        self.color_sel.trace_add("write", self.switch_color)
+
+        self.load_model_button = tk.Button(self.color_frame, text="Load Yolo model", 
+                                        command=lambda: self.run_in_thread(self.controller.load_model))
+        self.load_model_button.grid(column=1, row=7, padx=10, pady=10)
 
 
     def create_velocity_display(self):
+
+        self.velocity_frame = tk.LabelFrame(self.root, text="Velocities")
+        self.velocity_frame.grid(column=2, row=4, padx=10, pady=10, columnspan=2, rowspan=5, sticky="nwse")
         
-        self.lr_label = Label(self.root, text="Left-Right Velocity:", 
+        self.lr_label = Label(self.velocity_frame, text="Left-Right Velocity:", 
                             font=("Arial", 14))
-        self.lr_label.grid(column=2, row=3, padx=(20, 0))
+        self.lr_label.grid(column=0, row=0, padx=10)
         
-        self.fb_label = Label(self.root, text="For-Back Velocity:", 
+        self.fb_label = Label(self.velocity_frame, text="For-Back Velocity:", 
                             font=("Arial", 14))
-        self.fb_label.grid(column=2, row=4, padx=(20, 0))
+        self.fb_label.grid(column=0, row=1, padx=10)
         
-        self.ud_label = Label(self.root, text="Up-Down Velocity:", 
+        self.ud_label = Label(self.velocity_frame, text="Up-Down Velocity:", 
                             font=("Arial", 14))
-        self.ud_label.grid(column=2, row=5, padx=(20, 0))
+        self.ud_label.grid(column=0, row=2, padx=10)
         
-        self.yaw_label = Label(self.root, text="Yaw Velocity:", 
+        self.yaw_label = Label(self.velocity_frame, text="Yaw Velocity:", 
                             font=("Arial", 14))
-        self.yaw_label.grid(column=2, row=6, padx=(20, 0))
+        self.yaw_label.grid(column=0, row=3, padx=10)
 
 
-        self.lr_value = Label(self.root, text=" 000.00", 
+        self.lr_value = Label(self.velocity_frame, text=" 000.00", 
                             font=("Arial", 12))
-        self.lr_value.grid(column=3, row=3)
+        self.lr_value.grid(column=1, row=0, padx=10)
         
-        self.fb_value = Label(self.root, text="000.00", 
+        self.fb_value = Label(self.velocity_frame, text="000.00", 
                             font=("Arial", 12))
-        self.fb_value.grid(column=3, row=4)
+        self.fb_value.grid(column=1, row=1, padx=10)
         
-        self.ud_value = Label(self.root, text="000.00", 
+        self.ud_value = Label(self.velocity_frame, text="000.00", 
                             font=("Arial", 12))
-        self.ud_value.grid(column=3, row=5)
+        self.ud_value.grid(column=1, row=2, padx=10)
         
-        self.yaw_value = Label(self.root, text="000.00", 
+        self.yaw_value = Label(self.velocity_frame, text="000.00", 
                             font=("Arial", 12))
-        self.yaw_value.grid(column=3, row=6)
+        self.yaw_value.grid(column=1, row=3, padx=10)
 
-        Label(self.root, text="Max velocity:", font=("Arial", 12)).grid(row=7, column=2)
+        Label(self.velocity_frame, text="Max velocity:", font=("Arial", 14)).grid(row=4, column=0)
         self.max_velocity = tk.DoubleVar(value=100)
-        velocity_slider = tk.Scale(self.root, from_=0, to=100, resolution=1,
-                                   orient="horizontal", variable=self.max_velocity,
-                                   length=200)
-        velocity_slider.grid(row=7, column=3)
+        tk.Scale(self.velocity_frame, from_=0, to=100, resolution=1,
+                            orient="horizontal", variable=self.max_velocity,
+                            length=200).grid(row=4, column=1, padx=10)
 
 
     def create_video_panels(self):
