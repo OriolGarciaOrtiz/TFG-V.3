@@ -13,6 +13,7 @@ from typing import Optional
 class GUI:
     def __init__(self, root: tk.Tk):
         self.root = root
+
         self.is_connected: bool = False
         self.original_frame, self.detected_frame, self.mission_frame = None, None, None
         self.controller = HexsoonController()
@@ -270,29 +271,28 @@ class GUI:
 
     def create_mode_selectors(self):
 
-        tk.Label(self.root, text="Detection Mode:", font=("Arial", 14)).grid(row=0, column=4, padx=(20, 5), pady=10)
+        modes_frame = tk.LabelFrame(self.root, text="Selection Modes", padx=10, pady=10)
+        modes_frame.grid(row=0, column=4, columnspan=4, rowspan=5, sticky="nw", padx=10, pady=10)
+
+        tk.Label(modes_frame, text="Detection Mode:", font=("Arial", 14)).grid(row=0, column=0, padx=10, pady=10, sticky="w")
         self.detection_selection = tk.StringVar(value="Color Contour")
-        detection_menu = tk.OptionMenu(self.root, self.detection_selection, "Color Contour", "Neural Network")
-        detection_menu.grid(row=0, column=5, padx=10, pady=10)
+        tk.OptionMenu(modes_frame, self.detection_selection, "Color Contour", "Neural Network").grid(row=0, column=1, padx=10, pady=10, sticky="w")
 
-        Label(self.root, text="Test mode =", font=("Arial", 14)).grid(row=0, column=6, padx=10, pady=10)
+        Label(modes_frame, text="Test mode =", font=("Arial", 14)).grid(row=0, column=2, padx=10, pady=10, sticky="w")
         self.test_selection = tk.StringVar(value="Simulation")
-        test_menu = tk.OptionMenu(self.root, self.test_selection, "Simulation", "Practice")
-        test_menu.grid(row=0, column=7, padx=10, pady=10)
+        tk.OptionMenu(modes_frame, self.test_selection, "Simulation", "Practice").grid(row=0, column=3, padx=10, pady=10, sticky="w")
 
-        Label(self.root, text="Mode used =", font=("Arial", 14)).grid(row=1, column=4, padx=10, pady=10)
+        Label(modes_frame, text="Mode used =", font=("Arial", 14)).grid(row=1, column=0, padx=10, pady=10, sticky="w")
         self.view_selection = tk.StringVar(value="Bottom View")
-        view_menu = tk.OptionMenu(self.root, self.view_selection, "Front View", "Bottom View")
-        view_menu.grid(row=1, column=5, padx=9, pady=10)
+        tk.OptionMenu(modes_frame, self.view_selection, "Front View", "Bottom View").grid(row=1, column=1, padx=9, pady=10, sticky="w")
 
-
-        Label(self.root, text="Camera Used =", font=("Arial", 14)).grid(row=1, column=6, padx=10, pady=10)
+        Label(modes_frame, text="Camera Used =", font=("Arial", 14)).grid(row=1, column=2, padx=10, pady=10, sticky="w")
         self.type_camera_option = tk.StringVar(value="Default Cam")
-        type_camera_menu = tk.OptionMenu(self.root, self.type_camera_option, "Default Cam", "Raspi Cam", "Panoramic Cam")
-        type_camera_menu.grid(row=1, column=7, padx=9, pady=10)
+        tk.OptionMenu(modes_frame, self.type_camera_option, "Default Cam", "Raspi Cam", "Panoramic Cam").grid(row=1, column=3, padx=9, pady=10, sticky="w")
 
 
     def create_pid_controls(self):
+        
         self.Kp_x = tk.DoubleVar(value=0.1)
         self.Ki_x = tk.DoubleVar(value=0)
         self.Kd_x = tk.DoubleVar(value=0)
@@ -301,41 +301,42 @@ class GUI:
         self.Ki_y = tk.DoubleVar(value=0)
         self.Kd_y = tk.DoubleVar(value=0)
 
-        self.create_pid_slider_set("X", 150)
-        self.create_pid_slider_set("Y", 250)
+        pid_frame = tk.LabelFrame(self.root, text="PID Control", padx=10, pady=10)
+        pid_frame.grid(row=4, column=4, columnspan=4, rowspan=5, sticky="nw", padx=10, pady=10)
 
-        Label(self.root, text="Max velocity:", font=("Arial", 12)).grid(row=7, column=2)
-        self.max_velocity = tk.DoubleVar(value=100)
-        velocity_slider = tk.Scale(self.root, from_=0, to=100, resolution=1,
-                                   orient="horizontal", variable=self.max_velocity,
-                                   length=200)
-        velocity_slider.grid(row=7, column=3)
+        self.create_pid_grid(pid_frame)
 
 
-    def create_pid_slider_set(self, axis: str, y_pos: int):
-        kp_label = tk.Label(self.root, text=f"Kp-{axis} (Proportional)")
-        kp_label.place(x=800, y=y_pos)
+    def create_pid_grid(self, parent):
 
-        kp_var = getattr(self, f"Kp_{axis.lower()}")
-        kp_slider = tk.Scale(self.root, from_=0, to=2.0, resolution=0.01,
-                             orient="horizontal", variable=kp_var, length=200)
-        kp_slider.place(x=800, y=y_pos + 25)
+        tk.Label(parent, text="Kp").grid(row=0, column=1)
+        tk.Label(parent, text="Ki").grid(row=0, column=2)
+        tk.Label(parent, text="Kd").grid(row=0, column=3)
 
-        ki_label = tk.Label(self.root, text=f"Ki-{axis} (Integral)")
-        ki_label.place(x=1000, y=y_pos)
+        tk.Label(parent, text="X").grid(row=1, column=0, sticky="w")
+        tk.Label(parent, text="Y").grid(row=2, column=0, sticky="w")
 
-        ki_var = getattr(self, f"Ki_{axis.lower()}")
-        ki_slider = tk.Scale(self.root, from_=0, to=0.01, resolution=0.0001,
-                             orient="horizontal", variable=ki_var, length=200)
-        ki_slider.place(x=1000, y=y_pos + 25)
+        sliders = {
+            "Kp": (0, 2.0, 0.01),
+            "Ki": (0, 0.01, 0.0001),
+            "Kd": (0, 5, 0.1),
+        }
 
-        kd_label = tk.Label(self.root, text=f"Kd-{axis} (Derivative)")
-        kd_label.place(x=1200, y=y_pos)
+        for col, (name, (mn, mx, res)) in enumerate(sliders.items(), start=1):
 
-        kd_var = getattr(self, f"Kd_{axis.lower()}")
-        kd_slider = tk.Scale(self.root, from_=0, to=5, resolution=0.1,
-                             orient="horizontal", variable=kd_var, length=200)
-        kd_slider.place(x=1200, y=y_pos + 25)
+            tk.Scale(
+                parent, from_=mn, to=mx, resolution=res,
+                orient="horizontal",
+                length=200,
+                variable=getattr(self, f"{name}_x")
+            ).grid(row=1, column=col, sticky="ew", padx=5)
+
+            tk.Scale(
+                parent, from_=mn, to=mx, resolution=res,
+                orient="horizontal",
+                length=200,
+                variable=getattr(self, f"{name}_y")
+            ).grid(row=2, column=col, sticky="ew", padx=5)
 
 
     def create_hsv_sliders(self):
@@ -435,6 +436,13 @@ class GUI:
         self.yaw_value = Label(self.root, text="000.00", 
                             font=("Arial", 12))
         self.yaw_value.grid(column=3, row=6)
+
+        Label(self.root, text="Max velocity:", font=("Arial", 12)).grid(row=7, column=2)
+        self.max_velocity = tk.DoubleVar(value=100)
+        velocity_slider = tk.Scale(self.root, from_=0, to=100, resolution=1,
+                                   orient="horizontal", variable=self.max_velocity,
+                                   length=200)
+        velocity_slider.grid(row=7, column=3)
 
 
     def create_video_panels(self):
