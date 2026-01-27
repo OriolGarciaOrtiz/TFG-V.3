@@ -71,7 +71,7 @@ class GUI:
     def create_connection_widgets(self):
 
         self.connection_frame = tk.LabelFrame(self.root, text="Connection")
-        self.connection_frame.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=10, pady=10)
+        self.connection_frame.grid(column=0, row=0, columnspan=2, sticky="nwse", padx=10, pady=10)
 
         self.connected_label = Label(self.connection_frame, text="Not Connected", font=("Arial", 14))
         self.connected_label.grid(row=0, column=0, padx=10, pady=10)
@@ -287,10 +287,27 @@ class GUI:
         self.Ki_y = tk.DoubleVar(value=0)
         self.Kd_y = tk.DoubleVar(value=0)
 
-        pid_frame = tk.LabelFrame(self.root, text="PID Control", padx=10, pady=10)
-        pid_frame.grid(row=2, column=4, columnspan=4, rowspan=5, sticky="nwse", padx=10, pady=10)
+        self.pid_frame = tk.LabelFrame(self.root, text="PID Control", padx=10, pady=10)
+        self.pid_frame.grid(row=2, column=4, columnspan=4, rowspan=3, sticky="nwse", padx=10, pady=10)
+        self.pid_frame.grid_remove()
 
-        self.create_pid_grid(pid_frame)
+        self.create_pid_grid(self.pid_frame)
+
+        tk.Button(self.root, text="PID settings", command=self.show_pid_settings).grid(row=5, column=4)
+
+        tk.Button(self.root, text="Main settings", command=self.show_main_settings).grid(row=5, column=5)
+
+    def show_pid_settings(self):
+
+        self.velocity_frame.grid_remove()
+
+        self.pid_frame.grid()
+
+    def show_main_settings(self):
+
+        self.pid_frame.grid_remove()
+
+        self.velocity_frame.grid()
 
 
     def create_pid_grid(self, parent):
