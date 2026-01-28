@@ -47,18 +47,24 @@ class GUI:
         self.root.title("Hexsoon Drone Controller")
         self.root.geometry("1920x1080")
 
-        for i in range(8):
-            self.root.grid_columnconfigure(i, weight=1)
-        for i in range(12):
-            self.root.grid_rowconfigure(i, weight=1)
+        self.top_container = tk.Frame(self.root)
+        self.top_container.pack(side="top", fill="both", expand=True)
 
-        self.create_connection_widgets()
+        self.video_container = tk.LabelFrame(self.root, text="Video Frames")
+        self.video_container.pack(side="bottom", fill="x", padx=10, pady=10)
+
+        self.create_sidebar()
+        self.main_frame_create()
         self.create_video_panels()
+
         self.create_mode_selectors()
         self.create_control_buttons()
         self.create_hsv_sliders()
         self.create_pid_controls()
         self.create_velocity_display()
+
+        self.forget_all()
+
 
     def run_in_thread(self, target_func):
 
@@ -72,18 +78,58 @@ class GUI:
         thread = threading.Thread(target=task, daemon=True)
         thread.start()
         return thread
+    
+
+    def create_sidebar(self):
+        self.sidebar_frame = tk.Frame(self.top_container)
+        self.sidebar_frame.pack(side="left", fill="y", pady=10)
+
+        self.create_connection_widgets()
+        self.create_settings_frame()
 
 
     def create_connection_widgets(self):
 
-        self.connection_frame = tk.LabelFrame(self.root, text="Connection")
-        self.connection_frame.grid(column=0, row=0, columnspan=2, sticky="nwse", padx=10, pady=10)
+        self.connection_frame = tk.LabelFrame(self.sidebar_frame, text="Connection")
+        self.connection_frame.grid(column=0, row=0, rowspan=2, sticky="news", padx=10, pady=10)
 
-        self.connected_label = Label(self.connection_frame, text="Not Connected", font=("Arial", 14))
+        self.connected_label = Label(self.connection_frame, text="Not Connected", font=("Arial", 12))
         self.connected_label.grid(row=0, column=0, padx=10, pady=10)
 
         tk.Button(self.connection_frame, text="Connect",
-                command=lambda: self.run_in_thread(self.controller.connect_drone)).grid(row=0, column=1, padx=10, pady=10)
+                command=lambda: self.run_in_thread(self.controller.connect_drone)).grid(row=1, column=0, padx=10, pady=10)
+        
+    
+    def main_frame_create(self):
+        self.main_frame = tk.Frame(self.top_container)
+        self.main_frame.pack(side="left", fill="both", expand=True, pady=10)
+
+        self.left_col = tk.Frame(self.main_frame)
+        self.mid_col = tk.Frame(self.main_frame)
+        self.right_col = tk.Frame(self.main_frame)
+
+        self.left_col.grid(row=0, column=0, sticky="nsew")
+        self.mid_col.grid(row=0, column=1, sticky="nsew")
+        self.right_col.grid(row=0, column=2, sticky="nsew")
+
+
+    def create_settings_frame(self):
+
+        self.settings_frame = tk.LabelFrame(self.sidebar_frame, text="Settings")
+        self.settings_frame.grid(column=0, row=2, padx=10, rowspan=6, sticky="news")
+        self.settings_frame.columnconfigure(0, weight=1)
+
+        tk.Button(self.settings_frame, text="Main settings", command=self.show_main_settings).grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+
+        tk.Button(self.settings_frame, text="PID settings", command=self.show_pid_settings).grid(row=1, column=0, padx=10, pady=10, sticky="ew")
+
+        tk.Button(self.settings_frame, text="Soon").grid(row=2, column=0, padx=10, pady=10, sticky="ew")    
+
+        tk.Button(self.settings_frame, text="Soon").grid(row=3, column=0, padx=10, pady=10, sticky="ew")
+
+        tk.Button(self.settings_frame, text="Soon").grid(row=4, column=0, padx=10, pady=10, sticky="ew")
+
+        tk.Button(self.settings_frame, text="Soon").grid(row=5, column=0, padx=10, pady=10, sticky="ew")
 
 
     def load_colors(self, path: str):
@@ -234,53 +280,52 @@ class GUI:
 
     def create_control_buttons(self):
 
-        self.extra_controls_frame = tk.LabelFrame(self.root, text="Controls")
-        self.extra_controls_frame.grid(column=2, row=0, padx=10, pady=10, columnspan=2, rowspan=4, sticky="nsew")
+        self.extra_controls_frame = tk.LabelFrame(self.mid_col, text="Controls")
+        self.extra_controls_frame.grid(column=0, row=0, padx=10, pady=10, columnspan=3, rowspan=4, sticky="nw")
 
-        tk.Label(self.extra_controls_frame, text="Take-off alt:", font=("Arial", 14)).grid(column=0, row=0, padx=25, pady=10)
+        tk.Label(self.extra_controls_frame, text="Take-off alt:", font=("Arial", 14)).grid(column=0, row=0, padx=10, pady=10)
 
         self.takeoff_height = tk.Entry(self.extra_controls_frame, width=10)
         self.takeoff_height.insert(0, "2")
-        self.takeoff_height.grid(column=1, row=0, padx=25, pady=10)
+        self.takeoff_height.grid(column=1, row=0, padx=10, pady=10)
 
         tk.Button(self.extra_controls_frame, text="Arm and Take-off",
-            command=lambda: self.run_in_thread(self.controller.take_off_drone)).grid(column=0, row=1, padx=25, pady=10)
+            command=lambda: self.run_in_thread(self.controller.take_off_drone)).grid(column=0, row=1, padx=10, pady=10)
 
         tk.Button(self.extra_controls_frame, text="Landing",
-            command=lambda: self.run_in_thread(self.controller.land_drone)).grid(column=1, row=1, padx=25, pady=10)
+            command=lambda: self.run_in_thread(self.controller.land_drone)).grid(column=1, row=1, padx=10, pady=10)
 
         tk.Button(self.extra_controls_frame, text="Disconnect",
-            command=lambda: self.run_in_thread(self.controller.disconnect_drone)).grid(column=0, row=2, padx=25, pady=10)
+            command=lambda: self.run_in_thread(self.controller.disconnect_drone)).grid(column=0, row=2, padx=10, pady=10)
 
         tk.Button(self.extra_controls_frame, text="RTL",
-            command=lambda: self.run_in_thread(self.controller.Return_To_Launch_drone)).grid(column=1, row=2, padx=25, pady=10)
+            command=lambda: self.run_in_thread(self.controller.Return_To_Launch_drone)).grid(column=1, row=2, padx=10, pady=10)
         
-        Label(self.extra_controls_frame, text="Panoramic Zoom", font=("Arial", 12)).grid(row=3, column=0, padx=25, pady=10)
+        Label(self.extra_controls_frame, text="Panoramic Zoom", font=("Arial", 12)).grid(row=3, column=0, padx=10, pady=10)
         self.zoom_var = tk.DoubleVar(value=1.5)
         tk.Scale(self.extra_controls_frame, from_=1.0, to=20, resolution=0.1, orient="horizontal",
-            variable=self.zoom_var, length=200).grid(row=3, column=1, padx=25, pady=10)
+            variable=self.zoom_var, length=180).grid(row=3, column=1, padx=10, pady=10)
 
 
     def create_mode_selectors(self):
 
-        modes_frame = tk.LabelFrame(self.root, text="Selection Modes", padx=10, pady=10)
-        modes_frame.grid(row=0, column=4, columnspan=4, rowspan=2, sticky="nwse", padx=10, pady=10)
+        self.modes_frame = tk.LabelFrame(self.right_col, text="Selection Modes")
+        self.modes_frame.grid(row=0, column=0, columnspan=4, rowspan=2, sticky="nw", padx=10, pady=10)
 
-        tk.Label(modes_frame, text="Detection Mode:", font=("Arial", 14)).grid(row=0, column=0, padx=10, pady=10, sticky="w")
+        tk.Label(self.modes_frame, text="Detection Mode:", font=("Arial", 14)).grid(row=0, column=0, padx=10, pady=10, sticky="w")
         self.detection_selection = tk.StringVar(value="Color Contour")
-        tk.OptionMenu(modes_frame, self.detection_selection, "Color Contour", "Neural Network").grid(row=0, column=1, padx=10, pady=10, sticky="w")
+        tk.OptionMenu(self.modes_frame, self.detection_selection, "Color Contour", "Neural Network").grid(row=0, column=1, padx=10, pady=10, sticky="w")
 
-        Label(modes_frame, text="Test mode =", font=("Arial", 14)).grid(row=0, column=2, padx=10, pady=10, sticky="w")
+        Label(self.modes_frame, text="Test mode =", font=("Arial", 14)).grid(row=0, column=2, padx=10, pady=10, sticky="w")
         self.test_selection = tk.StringVar(value="Simulation")
-        tk.OptionMenu(modes_frame, self.test_selection, "Simulation", "Practice").grid(row=0, column=3, padx=10, pady=10, sticky="w")
-
-        Label(modes_frame, text="Mode used =", font=("Arial", 14)).grid(row=1, column=0, padx=10, pady=10, sticky="w")
+        tk.OptionMenu(self.modes_frame, self.test_selection, "Simulation", "Practice").grid(row=0, column=3, padx=10, pady=10, sticky="w")
+        Label(self.modes_frame, text="Mode used =", font=("Arial", 14)).grid(row=1, column=0, padx=10, pady=10, sticky="w")
         self.view_selection = tk.StringVar(value="Bottom View")
-        tk.OptionMenu(modes_frame, self.view_selection, "Front View", "Bottom View").grid(row=1, column=1, padx=9, pady=10, sticky="w")
+        tk.OptionMenu(self.modes_frame, self.view_selection, "Front View", "Bottom View").grid(row=1, column=1, padx=9, pady=10, sticky="w")
 
-        Label(modes_frame, text="Camera Used =", font=("Arial", 14)).grid(row=1, column=2, padx=10, pady=10, sticky="w")
+        Label(self.modes_frame, text="Camera Used =", font=("Arial", 14)).grid(row=1, column=2, padx=10, pady=10, sticky="w")
         self.type_camera_option = tk.StringVar(value="Default Cam")
-        tk.OptionMenu(modes_frame, self.type_camera_option, "Default Cam", "Raspi Cam", "Panoramic Cam").grid(row=1, column=3, padx=9, pady=10, sticky="w")
+        tk.OptionMenu(self.modes_frame, self.type_camera_option, "Default Cam", "Raspi Cam", "Panoramic Cam").grid(row=1, column=3, padx=9, pady=10, sticky="w")
 
 
     def create_pid_controls(self):
@@ -293,27 +338,31 @@ class GUI:
         self.Ki_y = tk.DoubleVar(value=0)
         self.Kd_y = tk.DoubleVar(value=0)
 
-        self.pid_frame = tk.LabelFrame(self.root, text="PID Control", padx=10, pady=10)
-        self.pid_frame.grid(row=2, column=4, columnspan=4, rowspan=3, sticky="nwse", padx=10, pady=10)
-        self.pid_frame.grid_remove()
+        self.pid_frame = tk.LabelFrame(self.main_frame, text="PID Control")
+        self.pid_frame.grid(row=0, column=0, columnspan=4, rowspan=3, padx=10, pady=10, sticky="nw")
 
         self.create_pid_grid(self.pid_frame)
 
-        tk.Button(self.root, text="PID settings", command=self.show_pid_settings).grid(row=5, column=4)
-
-        tk.Button(self.root, text="Main settings", command=self.show_main_settings).grid(row=5, column=5)
-
     def show_pid_settings(self):
 
-        self.velocity_frame.grid_remove()
+        self.forget_all()
 
-        self.pid_frame.grid()
+        self.pid_frame.grid(row=0, column=0, columnspan=2, sticky="nw")
 
     def show_main_settings(self):
 
-        self.pid_frame.grid_remove()
+        self.forget_all()
+        
+        self.color_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        self.extra_controls_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        self.velocity_frame.grid(row=5, column=0, sticky="nsew", padx=10, pady=10)
+        self.modes_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
-        self.velocity_frame.grid()
+        tk.Frame(self.left_col).grid(row=99, column=0, sticky="nsew")
+        tk.Frame(self.mid_col).grid(row=99, column=0, sticky="nsew")
+        tk.Frame(self.right_col).grid(row=99, column=0, sticky="nsew")
+
+        self.left_col.grid_rowconfigure(0, weight=1)
 
 
     def create_pid_grid(self, parent):
@@ -354,8 +403,8 @@ class GUI:
         self.s_min, self.s_max = tk.IntVar(value=55), tk.IntVar(value=255)
         self.v_min, self.v_max = tk.IntVar(value=100), tk.IntVar(value=255)
 
-        self.color_frame = tk.LabelFrame(self.root, text="Colors")
-        self.color_frame.grid(column=0, row=1, columnspan=2, rowspan=8, sticky="nwse", padx=10, pady=10)
+        self.color_frame = tk.LabelFrame(self.left_col, text="Colors")
+        self.color_frame.grid(column=0, row=0, sticky="nsew", padx=10, pady=10)
 
         sliders_config = [
             (self.h_min, "Hue Min:"),
@@ -420,8 +469,8 @@ class GUI:
 
     def create_velocity_display(self):
 
-        self.velocity_frame = tk.LabelFrame(self.root, text="Velocities")
-        self.velocity_frame.grid(column=2, row=4, padx=10, pady=10, columnspan=2, rowspan=5, sticky="nwse")
+        self.velocity_frame = tk.LabelFrame(self.mid_col, text="Velocities")
+        self.velocity_frame.grid(column=0, row=1, padx=10, columnspan=3, rowspan=5, sticky="nsew")
         
         self.lr_label = Label(self.velocity_frame, text="Left-Right Velocity:", 
                             font=("Arial", 14))
@@ -456,42 +505,38 @@ class GUI:
                             font=("Arial", 12))
         self.yaw_value.grid(column=1, row=3, padx=10)
 
-        Label(self.velocity_frame, text="Max velocity:", font=("Arial", 14)).grid(row=4, column=0)
+        Label(self.velocity_frame, text="Max velocity:", font=("Arial", 12)).grid(row=4, column=0)
         self.max_velocity = tk.DoubleVar(value=100)
         tk.Scale(self.velocity_frame, from_=0, to=100, resolution=1,
                             orient="horizontal", variable=self.max_velocity,
-                            length=200).grid(row=4, column=1, padx=10)
+                            length=150).grid(row=4, column=1, padx=10, sticky="we")
 
 
     def create_video_panels(self):
-        container = tk.LabelFrame(self.root, text="Video Frames")
-        container.grid(row=10, column=0, columnspan=8, sticky="nw", padx=10, pady=10)
+        container = self.video_container
+
         self.video_labels = []
 
-        hsv_frame = tk.Frame(container)
-        hsv_frame.grid(row=0, column=0, padx=25)
-        tk.Label(hsv_frame, text="HSV Mask", font=("Arial", 12)).pack(pady=(0, 5))
-        hsv_lbl = tk.Label(hsv_frame, width=self.controller.panel_width, height=self.controller.panel_height,
-                           bg="black")
-        hsv_lbl.pack(pady=(0, 10))
-        self.video_labels.append(hsv_lbl)
+        for col, (title, w, h) in enumerate([
+            ("HSV Mask", self.controller.panel_width, self.controller.panel_height),
+            ("Contour", self.controller.panel_width, self.controller.panel_height),
+            ("MissionPlanner", self.misson_panel_width, self.misson_panel_heigth),
+        ]):
+            frame = tk.Frame(container)
+            frame.grid(row=0, column=col, padx=25)
 
-        contour_frame = tk.Frame(container)
-        contour_frame.grid(row=0, column=1, padx=25)
-        tk.Label(contour_frame, text="Contour", font=("Arial", 12)).pack(pady=(0, 5))
-        contour_lbl = tk.Label(contour_frame, width=self.controller.panel_width, height=self.controller.panel_height,
-                               bg="black")
-        contour_lbl.pack(pady=(0, 10))
-        self.video_labels.append(contour_lbl)
+            tk.Label(frame, text=title, font=("Arial", 12)).pack(pady=(0, 5))
+            lbl = tk.Label(frame, width=w, height=h, bg="black")
+            lbl.pack(pady=(0, 10))
+            self.video_labels.append(lbl)
 
-        mission_frame = tk.Frame(container)
-        mission_frame.grid(row=0, column=2, padx=25)
-        tk.Label(mission_frame, text="MissionPlanner", font=("Arial", 12)).pack(pady=(0, 5))
-        mission_lbl = tk.Label(mission_frame, width=self.misson_panel_width, height=self.misson_panel_heigth,
-                               bg="black")
-        mission_lbl.pack(pady=(0, 10))
-        self.video_labels.append(mission_lbl)
+    def forget_all(self):
 
+        self.pid_frame.grid_remove()
+        self.velocity_frame.grid_remove()
+        self.extra_controls_frame.grid_remove()
+        self.modes_frame.grid_remove()
+        self.color_frame.grid_remove()
 
     def transfer_data(self):
 
