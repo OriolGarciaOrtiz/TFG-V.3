@@ -46,6 +46,12 @@ class GUI:
     def setup_gui(self):
         self.root.title("Hexsoon Drone Controller")
         self.root.geometry("1920x1080")
+
+        for i in range(8):
+            self.root.grid_columnconfigure(i, weight=1)
+        for i in range(12):
+            self.root.grid_rowconfigure(i, weight=1)
+
         self.create_connection_widgets()
         self.create_video_panels()
         self.create_mode_selectors()
@@ -228,30 +234,30 @@ class GUI:
 
     def create_control_buttons(self):
 
-        self.extra_contros_frame = tk.LabelFrame(self.root, text="Controls")
-        self.extra_contros_frame.grid(column=2, row=0, padx=10, pady=10, columnspan=2, rowspan=4, sticky="nsew")
+        self.extra_controls_frame = tk.LabelFrame(self.root, text="Controls")
+        self.extra_controls_frame.grid(column=2, row=0, padx=10, pady=10, columnspan=2, rowspan=4, sticky="nsew")
 
-        tk.Label(self.extra_contros_frame, text="Take-off alt:", font=("Arial", 14)).grid(column=0, row=0, padx=25, pady=10)
+        tk.Label(self.extra_controls_frame, text="Take-off alt:", font=("Arial", 14)).grid(column=0, row=0, padx=25, pady=10)
 
-        self.takeoff_height = tk.Entry(self.extra_contros_frame, width=10)
+        self.takeoff_height = tk.Entry(self.extra_controls_frame, width=10)
         self.takeoff_height.insert(0, "2")
         self.takeoff_height.grid(column=1, row=0, padx=25, pady=10)
 
-        tk.Button(self.extra_contros_frame, text="Arm and Take-off",
+        tk.Button(self.extra_controls_frame, text="Arm and Take-off",
             command=lambda: self.run_in_thread(self.controller.take_off_drone)).grid(column=0, row=1, padx=25, pady=10)
 
-        tk.Button(self.extra_contros_frame, text="Landing",
+        tk.Button(self.extra_controls_frame, text="Landing",
             command=lambda: self.run_in_thread(self.controller.land_drone)).grid(column=1, row=1, padx=25, pady=10)
 
-        tk.Button(self.extra_contros_frame, text="Disconnect",
+        tk.Button(self.extra_controls_frame, text="Disconnect",
             command=lambda: self.run_in_thread(self.controller.disconnect_drone)).grid(column=0, row=2, padx=25, pady=10)
 
-        tk.Button(self.extra_contros_frame, text="RTL",
+        tk.Button(self.extra_controls_frame, text="RTL",
             command=lambda: self.run_in_thread(self.controller.Return_To_Launch_drone)).grid(column=1, row=2, padx=25, pady=10)
         
-        Label(self.extra_contros_frame, text="Panoramic Zoom", font=("Arial", 12)).grid(row=3, column=0, padx=25, pady=10)
+        Label(self.extra_controls_frame, text="Panoramic Zoom", font=("Arial", 12)).grid(row=3, column=0, padx=25, pady=10)
         self.zoom_var = tk.DoubleVar(value=1.5)
-        tk.Scale(self.extra_contros_frame, from_=1.0, to=20, resolution=0.1, orient="horizontal",
+        tk.Scale(self.extra_controls_frame, from_=1.0, to=20, resolution=0.1, orient="horizontal",
             variable=self.zoom_var, length=200).grid(row=3, column=1, padx=25, pady=10)
 
 
