@@ -48,7 +48,12 @@ class GUI:
         self.root.geometry("1920x1080")
 
         self.top_container = tk.Frame(self.root)
-        self.top_container.pack(side="top", fill="both", expand=True)
+        self.top_container.pack(fill="both", expand=True)
+
+        self.top_container.columnconfigure(0, weight=1)
+        self.top_container.columnconfigure(1, weight=4)
+        self.top_container.rowconfigure(0, weight=1)
+
 
         self.video_container = tk.LabelFrame(self.root, text="Video Frames")
         self.video_container.pack(side="bottom", fill="x", padx=10, pady=10)
@@ -82,7 +87,7 @@ class GUI:
 
     def create_sidebar(self):
         self.sidebar_frame = tk.Frame(self.top_container)
-        self.sidebar_frame.pack(side="left", fill="y", pady=10)
+        self.sidebar_frame.grid(row=0, column=0, sticky="nsw", padx=10, pady=10)
 
         self.create_connection_widgets()
         self.create_settings_frame()
@@ -102,7 +107,13 @@ class GUI:
     
     def main_frame_create(self):
         self.main_frame = tk.Frame(self.top_container)
-        self.main_frame.pack(side="left", fill="both", expand=True, pady=10)
+        self.main_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+
+        self.main_frame.columnconfigure(0, weight=1)
+        self.main_frame.columnconfigure(1, weight=1)
+        self.main_frame.columnconfigure(2, weight=1)
+
+        self.main_frame.rowconfigure(0, weight=1)
 
         self.left_col = tk.Frame(self.main_frame)
         self.mid_col = tk.Frame(self.main_frame)
@@ -111,6 +122,11 @@ class GUI:
         self.left_col.grid(row=0, column=0, sticky="nsew")
         self.mid_col.grid(row=0, column=1, sticky="nsew")
         self.right_col.grid(row=0, column=2, sticky="nsew")
+
+
+        for col in (self.left_col, self.mid_col, self.right_col):
+            col.grid_rowconfigure(0, weight=1)
+            col.grid_columnconfigure(0, weight=1)
 
 
     def create_settings_frame(self):
