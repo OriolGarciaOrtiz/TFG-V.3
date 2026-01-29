@@ -45,7 +45,6 @@ class GUI:
 
     def setup_gui(self):
         self.root.title("Hexsoon Drone Controller")
-        self.root.geometry("1920x1080")
 
         self.top_container = tk.Frame(self.root)
         self.top_container.pack(fill="both", expand=True)
@@ -320,7 +319,7 @@ class GUI:
         Label(self.extra_controls_frame, text="Panoramic Zoom", font=("Arial", 12)).grid(row=3, column=0, padx=10, pady=10)
         self.zoom_var = tk.DoubleVar(value=1.5)
         tk.Scale(self.extra_controls_frame, from_=1.0, to=20, resolution=0.1, orient="horizontal",
-            variable=self.zoom_var, length=180).grid(row=3, column=1, padx=10, pady=10)
+            variable=self.zoom_var).grid(row=3, column=1, padx=10, pady=10)
 
 
     def create_mode_selectors(self):
@@ -455,7 +454,6 @@ class GUI:
                 from_=0, to=val,
                 orient="horizontal",
                 variable=var,
-                length=200,
                 command=on_slide
             )
             slider.grid(row=i, column=1, padx=10)
@@ -524,8 +522,7 @@ class GUI:
         Label(self.velocity_frame, text="Max velocity:", font=("Arial", 12)).grid(row=4, column=0)
         self.max_velocity = tk.DoubleVar(value=100)
         tk.Scale(self.velocity_frame, from_=0, to=100, resolution=1,
-                            orient="horizontal", variable=self.max_velocity,
-                            length=150).grid(row=4, column=1, padx=10, sticky="we")
+                            orient="horizontal", variable=self.max_velocity).grid(row=4, column=1, padx=10, sticky="we")
 
 
     def create_video_panels(self):
