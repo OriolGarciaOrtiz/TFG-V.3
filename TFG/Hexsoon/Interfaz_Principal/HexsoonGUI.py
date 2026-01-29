@@ -16,10 +16,11 @@ class GUI:
 
         self.is_connected: bool = False
         self.original_frame, self.detected_frame, self.mission_frame = None, None, None
-        self.controller = HexsoonController()
 
-        self.misson_panel_heigth: int = self.controller.panel_height
-        self.misson_panel_width: int = int(self.misson_panel_heigth * 16 / 9)
+        self.panel_height: int = 0
+        self.panel_width: int = 0
+        self.mission_panel_height: int = 0
+        self.mission_panel_width: int = 0
 
         init(autoreset=True)
 
@@ -38,6 +39,8 @@ class GUI:
 
         self.setup_gui()
 
+        self.controller = HexsoonController(self.panel_height, self.panel_width)
+
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
         self.update_frame()
@@ -53,21 +56,25 @@ class GUI:
         self.top_container.columnconfigure(1, weight=4)
         self.top_container.rowconfigure(0, weight=1)
 
-
         self.video_container = tk.LabelFrame(self.root, text="Video Frames")
-        self.video_container.pack(side="bottom", fill="x", padx=10, pady=10)
+        self.video_container.pack(fill="both", expand=True, padx=10, pady=10)
+
+        self.video_container.columnconfigure(0, weight=4)
+        self.video_container.columnconfigure(1, weight=4)
+        self.video_container.columnconfigure(2, weight=6)
+        self.video_container.rowconfigure(0, weight=1)
 
         self.create_sidebar()
         self.main_frame_create()
-        self.create_video_panels()
 
         self.create_mode_selectors()
         self.create_control_buttons()
         self.create_hsv_sliders()
         self.create_pid_controls()
         self.create_velocity_display()
+        self.create_video_panels()
 
-        self.forget_all()
+        self.show_main_settings()
 
 
     def run_in_thread(self, target_func):
@@ -82,8 +89,8 @@ class GUI:
         thread = threading.Thread(target=task, daemon=True)
         thread.start()
         return thread
-    
 
+    
     def create_sidebar(self):
         self.sidebar_frame = tk.Frame(self.top_container)
         self.sidebar_frame.grid(row=0, column=0, sticky="nsw", padx=10, pady=10)
@@ -297,6 +304,7 @@ class GUI:
 
         self.extra_controls_frame = tk.LabelFrame(self.mid_col, text="Controls")
         self.extra_controls_frame.grid(column=0, row=0, padx=10, pady=10, columnspan=3, rowspan=4, sticky="nw")
+        self.extra_controls_frame.columnconfigure(1, weight=1)
 
         tk.Label(self.extra_controls_frame, text="Take-off alt:", font=("Arial", 14)).grid(column=0, row=0, padx=10, pady=10)
 
@@ -319,7 +327,7 @@ class GUI:
         Label(self.extra_controls_frame, text="Panoramic Zoom", font=("Arial", 12)).grid(row=3, column=0, padx=10, pady=10)
         self.zoom_var = tk.DoubleVar(value=1.5)
         tk.Scale(self.extra_controls_frame, from_=1.0, to=20, resolution=0.1, orient="horizontal",
-            variable=self.zoom_var).grid(row=3, column=1, padx=10, pady=10)
+            variable=self.zoom_var).grid(row=3, column=1, sticky="we", pady=10, padx=10)
 
 
     def create_mode_selectors(self):
@@ -380,7 +388,11 @@ class GUI:
         self.left_col.grid_rowconfigure(0, weight=1)
 
 
-    def create_pid_grid(self, parent):
+    def create_pid_grid(self, parent: tk.Frame):
+
+        parent.columnconfigure(1, weight=1)
+        parent.columnconfigure(2, weight=1)
+        parent.columnconfigure(3, weight=1)
 
         tk.Label(parent, text="Kp").grid(row=0, column=1)
         tk.Label(parent, text="Ki").grid(row=0, column=2)
@@ -400,14 +412,12 @@ class GUI:
             tk.Scale(
                 parent, from_=mn, to=mx, resolution=res,
                 orient="horizontal",
-                length=200,
                 variable=getattr(self, f"{name}_x")
             ).grid(row=1, column=col, sticky="ew", padx=5)
 
             tk.Scale(
                 parent, from_=mn, to=mx, resolution=res,
                 orient="horizontal",
-                length=200,
                 variable=getattr(self, f"{name}_y")
             ).grid(row=2, column=col, sticky="ew", padx=5)
 
@@ -420,6 +430,7 @@ class GUI:
 
         self.color_frame = tk.LabelFrame(self.left_col, text="Colors")
         self.color_frame.grid(column=0, row=0, sticky="nsew", padx=10, pady=10)
+        self.color_frame.columnconfigure(1, weight=1)
 
         sliders_config = [
             (self.h_min, "Hue Min:"),
@@ -456,7 +467,7 @@ class GUI:
                 variable=var,
                 command=on_slide
             )
-            slider.grid(row=i, column=1, padx=10)
+            slider.grid(row=i, column=1, sticky="we", padx=10)
 
             Label( self.color_frame, text=text, font=("Arial", 12)).grid(row=i, column=0)
 
@@ -485,6 +496,7 @@ class GUI:
 
         self.velocity_frame = tk.LabelFrame(self.mid_col, text="Velocities")
         self.velocity_frame.grid(column=0, row=1, padx=10, columnspan=3, rowspan=5, sticky="nsew")
+        self.velocity_frame.columnconfigure(1, weight=1)
         
         self.lr_label = Label(self.velocity_frame, text="Left-Right Velocity:", 
                             font=("Arial", 14))
@@ -522,26 +534,54 @@ class GUI:
         Label(self.velocity_frame, text="Max velocity:", font=("Arial", 12)).grid(row=4, column=0)
         self.max_velocity = tk.DoubleVar(value=100)
         tk.Scale(self.velocity_frame, from_=0, to=100, resolution=1,
-                            orient="horizontal", variable=self.max_velocity).grid(row=4, column=1, padx=10, sticky="we")
+                            orient="horizontal", variable=self.max_velocity).grid(row=4, column=1, sticky="we", padx=10)
 
 
     def create_video_panels(self):
-        container = self.video_container
+        self.hsv_aspect = 4/3
+        self.contour_aspect = 4/3
+        self.mission_aspect = 16/9
 
-        self.video_labels = []
+        self.root.update_idletasks()
+        self.root.update()
 
-        for col, (title, w, h) in enumerate([
-            ("HSV Mask", self.controller.panel_width, self.controller.panel_height),
-            ("Contour", self.controller.panel_width, self.controller.panel_height),
-            ("MissionPlanner", self.misson_panel_width, self.misson_panel_heigth),
-        ]):
-            frame = tk.Frame(container)
-            frame.grid(row=0, column=col, padx=25)
+        avail_w = self.video_container.winfo_width()
+        avail_h = self.video_container.winfo_height()
 
-            tk.Label(frame, text=title, font=("Arial", 12)).pack(pady=(0, 5))
-            lbl = tk.Label(frame, width=w, height=h, bg="black")
-            lbl.pack(pady=(0, 10))
-            self.video_labels.append(lbl)
+        padx = 5
+        pady = 5
+        num_panels = 3
+
+        total_pad_w = num_panels * 2 * padx
+        max_h_w = (avail_w - total_pad_w) / (self.hsv_aspect + self.contour_aspect + self.mission_aspect)
+
+        panel_h = min(max_h_w, avail_h - 2*pady)
+
+        w_hsv = int(panel_h * self.hsv_aspect)
+        w_contour = int(panel_h * self.contour_aspect)
+        w_mission = int(panel_h * self.mission_aspect)
+        panel_h = int(panel_h)
+
+        # Create canvases
+        self.hsv_panel = tk.Canvas(self.video_container, bg="black", width=w_hsv, height=panel_h)
+        self.contour_panel = tk.Canvas(self.video_container, bg="black", width=w_contour, height=panel_h)
+        self.mission_panel = tk.Canvas(self.video_container, bg="black", width=w_mission, height=panel_h)
+
+        self.hsv_panel.grid(row=0, column=0, sticky="nsew", padx=padx, pady=pady)
+        self.contour_panel.grid(row=0, column=1, sticky="nsew", padx=padx, pady=pady)
+        self.mission_panel.grid(row=0, column=2, sticky="nsew", padx=padx, pady=pady)
+
+        # Column config
+        for i in range(3):
+            self.video_container.columnconfigure(i, weight=1)
+        self.video_container.rowconfigure(0, weight=1)
+
+        # Store sizes
+        self.panel_height = panel_h
+        self.panel_width = w_hsv
+        self.mission_panel_height = panel_h
+        self.mission_panel_width = w_mission
+
 
     def forget_all(self):
 
@@ -587,16 +627,24 @@ class GUI:
         self.controller.zoom_factor = self.zoom_var.get()
 
 
-    def update_video_frames(self, frames: list[Optional[np.ndarray]]):
+    def update_video_frames(self, frames):
+        panel_data = [
+            (self.hsv_panel, frames[0]),
+            (self.contour_panel, frames[1]),
+            (self.mission_panel, frames[2]),
+        ]
 
-        try:
-            for lbl, frame in zip(self.video_labels, frames):
-                if frame is not None:
-                    imgtk = ImageTk.PhotoImage(Image.fromarray(frame))
-                    lbl.imgtk = imgtk
-                    lbl.config(image=imgtk)
-        except Exception as e:
-            print(Fore.RED + f"Error updating video frames: {e}")
+        for panel, frame in panel_data:
+            if frame is None:
+                continue
+
+            panel_w = panel.winfo_width()
+            panel_h = panel.winfo_height()
+            resized = Image.fromarray(frame).resize((panel_w, panel_h), Image.BILINEAR)
+            imgtk = ImageTk.PhotoImage(resized)
+            panel.imgtk = imgtk
+            panel.delete("all")
+            panel.create_image(0, 0, anchor="nw", image=imgtk)
 
 
     def update_velocity_labels(self):
@@ -608,6 +656,8 @@ class GUI:
 
 
     def update_frame(self):
+
+        print(self.panel_width/self.panel_height)
 
         if not self.running:
             return

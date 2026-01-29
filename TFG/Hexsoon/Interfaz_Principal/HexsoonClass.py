@@ -14,7 +14,7 @@ import os
 
 
 class HexsoonController:
-    def __init__(self):
+    def __init__(self, p_height: int, p_width: int):
         self.is_connected: bool = False
         self.dron: Dron = Dron()
         self.cap = None
@@ -27,8 +27,8 @@ class HexsoonController:
         self.detected_color: str | None = None
         self.model: YOLO | None = None
 
-        self.panel_height: int = 300
-        self.panel_width: int = int(self.panel_height * 320/240)
+        self.panel_height: int = p_height
+        self.panel_width: int = p_width
 
         self.colors: dict | None = None
 

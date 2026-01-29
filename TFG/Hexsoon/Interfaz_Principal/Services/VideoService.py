@@ -44,7 +44,11 @@ class ServiceVideo:
 
                 if mission_frame is None:
 
-                    mission_frame = np.zeros((self.target_gui.misson_panel_width, self.target_gui.misson_panel_heigth, 3), dtype=np.uint8)
+                    mission_frame = np.zeros(
+                        (self.target_gui.mission_panel_height, self.target_gui.mission_panel_width, 3),
+                        dtype=np.uint8
+                    )
+
                     cv2.putText(mission_frame, "Mission Planner", 
                                 (20, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
@@ -65,5 +69,5 @@ class ServiceVideo:
             except queue.Empty:
                 time.sleep(1/self.target_gui.FPS)
             except Exception as e:
-                print("Video thread error: {e}")
+                print("Video thread error:", e)
                 time.sleep(1/self.target_gui.FPS)

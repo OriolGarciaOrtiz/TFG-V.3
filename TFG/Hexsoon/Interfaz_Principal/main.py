@@ -12,8 +12,9 @@ def main():
         root.attributes('-fullscreen', True)
         root.bind("<Escape>", lambda e: root.attributes("-fullscreen", False))
 
-
         hexsoon_gui = HexsoonGUI(root)
+
+        root.update_idletasks()
 
         thread_handler = HandlerThreads(hexsoon_gui)
 
